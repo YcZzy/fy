@@ -24,12 +24,20 @@ function ensureState() {
   if (!state || typeof state !== 'object' || Array.isArray(state)) {
     state = createInitialState()
     wx.setStorageSync(STORAGE_KEY, state)
-  } else if (state.version !== 2) {
+  } else if (state.version !== 3) {
     state.domains = [...(state.domains || []), ...DOMAINS.filter((item) => !(state.domains || []).some((existing) => existing.id === item.id))]
     state.actions = [...(state.actions || []), ...ACTIONS.filter((item) => !(state.actions || []).some((existing) => existing.id === item.id))]
+    state.preferences = state.preferences || createInitialState().preferences
+    state.plans = state.plans || []
+    state.wishes = state.wishes || []
+    state.footprints = state.footprints || []
+    state.reviews = state.reviews || []
+    state.conversations = state.conversations || []
+    state.declinedActions = (state.declinedActions || state.declinedActionIds || []).map((item) => typeof item === 'string' ? { actionId: item, declinedAt: 0, contextKey: '' } : item)
+    delete state.declinedActionIds
     state.pendingFileDeletes = state.pendingFileDeletes || []
     state.syncQueue = state.syncQueue || []
-    state.version = 2
+    state.version = 3
     wx.setStorageSync(STORAGE_KEY, state)
   }
   return state
@@ -67,14 +75,19 @@ function completeOnboarding(interests, wish) {
 function saveContext(context) {
   return update((state) => { state.preferences.lastContext = context; state.preferences.updatedAt = Date.now() })
 }
-function saveRecommendations(items, key, source) {
-  return update((state) => { state.recommendationCache = { key, items, source, createdAt: Date.now(), swaps: 0 } })
+function saveRecommendations(items, key, source, swaps = 0) {
+  return update((state) => { state.recommendationCache = { key, items, source, createdAt: Date.now(), swaps } })
 }
+function clearRecommendationCache() { return update((state) => { state.recommendationCache = null }) }
 function incrementRecommendationSwaps() {
   return update((state) => { if (state.recommendationCache) state.recommendationCache.swaps += 1 })
 }
-function declineAction(actionId) {
-  return update((state) => { if (!state.declinedActionIds.includes(actionId)) state.declinedActionIds.push(actionId) })
+function declineAction(actionId, contextKey = '') {
+  return update((state) => {
+    state.declinedActions = (state.declinedActions || []).filter((item) => item.actionId !== actionId)
+    state.declinedActions.push({ actionId, contextKey, declinedAt: Date.now() })
+    state.declinedActions = state.declinedActions.slice(-30)
+  })
 }
 function startSession(action, mode, options = {}) {
   const now = Date.now()
@@ -83,8 +96,13 @@ function startSession(action, mode, options = {}) {
       state.activeSession = { id: uid('s'), actionId: action.id, actionName: action.name, actionSnapshot: action, startedAt: now, expectedEndAt: now + action.minutes * 60000, status: 'running', reminder: Boolean(options.reminder), reminderPrompted: false }
       state.pendingAction = null
     } else {
-      state.pendingAction = { id: uid('pending'), actionId: action.id, actionName: action.name, actionSnapshot: action, startedAt: now, prompted: false }
+      state.pendingAction = { id: uid('pending'), actionId: action.id, actionName: action.name, actionSnapshot: action, startedAt: now, promptAfterAt: now + 60000, backgroundedAt: 0, prompted: false }
     }
+  })
+}
+function markPendingActionBackgrounded() {
+  return update((state) => {
+    if (state.pendingAction && !state.pendingAction.prompted) state.pendingAction.backgroundedAt = Date.now()
   })
 }
 function pauseSession() {
@@ -154,7 +172,17 @@ function saveAction(action) {
   })
 }
 function hideAction(id) { return update((state) => { const action = state.actions.find((item) => item.id === id); if (action) action.hidden = true }) }
+function deleteAction(id) {
+  return update((state) => { state.actions = state.actions.filter((item) => item.id !== id) })
+}
 function saveReview(review) { return update((state) => { state.reviews.unshift({ id: uid('r'), createdAt: Date.now(), ...review }) }) }
+function updateReview(id, content) {
+  return update((state) => {
+    const review = state.reviews.find((item) => item.id === id)
+    if (review) { review.content = content; review.updatedAt = Date.now() }
+  })
+}
+function deleteReview(id) { return update((state) => { state.reviews = state.reviews.filter((item) => item.id !== id) }) }
 function saveConversation(conversation) {
   return update((state) => {
     const index = state.conversations.findIndex((item) => item.id === conversation.id)
@@ -172,9 +200,9 @@ function deleteAllPersonalData() {
 
 module.exports = {
   ensureState, getState, saveState, update, completeOnboarding, saveContext,
-  saveRecommendations, incrementRecommendationSwaps, declineAction, startSession,
+  saveRecommendations, clearRecommendationCache, incrementRecommendationSwaps, declineAction, startSession, markPendingActionBackgrounded,
   pauseSession, resumeSession, clearSession, resolvePending, reconcileActiveSession,
   addFootprint, saveFootprint, deleteFootprint, queueFileDeletes, savePlan, addWish, deleteWish, saveReview,
-  saveAction, hideAction, saveConversation, clearConversations, deleteAllPersonalData,
+  saveAction, hideAction, deleteAction, saveConversation, clearConversations, deleteAllPersonalData, updateReview, deleteReview,
   changedCollections
 }

@@ -9,9 +9,10 @@ const FEELINGS = [
   { value: 'poor', label: '不太喜欢', symbol: '淡' }
 ]
 const DURATIONS = [{ label: '10 分钟', value: 10 }, { label: '半小时', value: 30 }, { label: '1 小时', value: 60 }, { label: '2 小时', value: 120 }, { label: '不记录', value: null }]
+const COMPLETIONS = [{ value: 'done', label: '做完了' }, { value: 'partial', label: '做了一部分' }, { value: 'not_started', label: '最后没做' }]
 
 Page({
-  data: { action: null, feelings: FEELINGS, durations: DURATIONS, minutes: 30, customMinutes: '', feeling: '', note: '', again: '', photoPath: '', location: null, saving: false },
+  data: { action: null, feelings: FEELINGS, durations: DURATIONS, completions: COMPLETIONS, completion: 'done', minutes: 30, customMinutes: '', feeling: '', note: '', again: '', photoPath: '', location: null, saving: false },
   onLoad(options) {
     this.actionId = options.actionId
     this.footprintId = options.footprintId || ''
@@ -33,7 +34,7 @@ Page({
       this.originalLocalPhotoPaths = existing.localPhotoPaths || []
       this.setData({
         action: { ...action, domainName: existing.domainName || action.domainName || (domain && domain.name) || '生活' }, minutes,
-        customMinutes: minutes === null ? '' : String(minutes), feeling: existing.feeling || '', note: existing.note || '', again: existing.doAgain || '',
+        customMinutes: minutes === null ? '' : String(minutes), completion: existing.completionStatus || (existing.completed === false ? 'partial' : 'done'), feeling: existing.feeling || '', note: existing.note || '', again: existing.doAgain || '',
         photoPath: (existing.localPhotoPaths && existing.localPhotoPaths[0]) || (existing.photoFileIds && existing.photoFileIds[0]) || '', location: existing.location || null
       })
     } else this.setData({ action: { ...action, domainName: action.domainName || (domain && domain.name) || '生活' }, minutes, customMinutes: String(minutes) })
@@ -48,6 +49,10 @@ Page({
     this.setData({ customMinutes: value, minutes: value ? Number(value) : null })
   },
   selectFeeling(event) { this.setData({ feeling: event.currentTarget.dataset.value }) },
+  selectCompletion(event) {
+    const completion = event.currentTarget.dataset.value
+    this.setData({ completion, ...(completion === 'not_started' ? { minutes: null, customMinutes: '' } : {}) })
+  },
   onNote(event) { this.setData({ note: event.detail.value }) },
   selectAgain(event) { this.setData({ again: event.currentTarget.dataset.value }) },
   choosePhoto() {
@@ -80,7 +85,7 @@ Page({
         domainName: this.data.action.domainName, planId: this.data.action.planId || '', minutes: this.data.minutes,
         feeling: this.data.feeling, feelingLabel: feelingOption ? feelingOption.label : '未记录感受', note: this.data.note.trim(),
         doAgain: this.data.again, photoFileIds: photo.fileId ? [photo.fileId] : [], localPhotoPaths: photo.localPath ? [photo.localPath] : [],
-        location: this.data.location, completed: true, sourceMode: this.mode
+        location: this.data.location, completionStatus: this.data.completion, completed: this.data.completion === 'done', sourceMode: this.mode
       }
       if (this.footprintId) repository.saveFootprint(payload)
       else repository.addFootprint(payload)
@@ -95,7 +100,7 @@ Page({
   },
   skip() {
       if (this.footprintId) { wx.navigateBack(); return }
-      repository.addFootprint({ actionId: this.data.action.id, actionName: this.data.action.name, domainId: this.data.action.domainId, domainName: this.data.action.domainName, planId: this.data.action.planId || '', minutes: null, feeling: '', feelingLabel: '未记录感受', completed: true, sourceMode: this.mode })
+      repository.addFootprint({ actionId: this.data.action.id, actionName: this.data.action.name, domainId: this.data.action.domainId, domainName: this.data.action.domainName, planId: this.data.action.planId || '', minutes: null, feeling: '', feelingLabel: '未记录感受', completionStatus: this.data.completion, completed: this.data.completion === 'done', sourceMode: this.mode })
     wx.switchTab({ url: '/pages/footprints/index' })
   }
 })

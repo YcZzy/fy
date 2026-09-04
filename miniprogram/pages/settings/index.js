@@ -6,7 +6,8 @@ Page({
   data: { cloudReady: false, envLabel: '本地模式', counts: {} },
   onShow() {
     const state = repository.getState()
-    this.setData({ cloudReady: cloud.isSyncReady(), envLabel: env.CLOUD_ENV_ID || '尚未配置', counts: { plans: state.plans.length, footprints: state.footprints.length, conversations: state.conversations.length } })
+    const app = getApp()
+    this.setData({ cloudReady: Boolean(cloud.isSyncReady() && app.globalData.cloudReady), envLabel: env.CLOUD_ENV_ID || '尚未配置', counts: { plans: state.plans.length, footprints: state.footprints.length, conversations: state.conversations.length } })
   },
   openLocationSettings() { wx.openSetting() },
   clearChats() {

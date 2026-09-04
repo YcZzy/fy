@@ -23,9 +23,10 @@
       <view class="chips interest-list">
         <view wx:for="{{interests}}" wx:key="*this" class="chip interest {{selectedMap[item] ? 'active' : ''}}" data-value="{{item}}" bindtap="toggleInterest">{{item}}</view>
       </view>
+      <view class="custom-interest"><input maxlength="12" value="{{customInterest}}" placeholder="还有别的？自己写一个" bindinput="onCustomInterest"/><button class="ghost-btn" bindtap="addCustomInterest">加入</button></view>
     </view>
 
-    <view wx:else class="stage">
+    <view wx:elif="{{step === 2}}" class="stage">
       <text class="eyebrow">近来惦记</text>
       <view class="stage-title">有没有一件模糊想做的事？</view>
       <view class="hero-subtitle">只记下来，不必现在变成目标。以后可以请风月帮你慢慢展开。</view>
@@ -35,6 +36,16 @@
       </view>
     </view>
 
-    <button class="primary-btn next-btn" bindtap="next">{{step === 2 ? '开始看看生活' : '继续'}}</button>
+    <view wx:else class="stage action-stage">
+      <text class="eyebrow">先备下一些选择</text>
+      <view class="stage-title">这是你的初始行动库</view>
+      <view class="hero-subtitle">按刚才的选择排在前面。可以修改、移除或补充，以后也能随时调整。</view>
+      <view class="initial-actions solid-card">
+        <view wx:for="{{previewActions}}" wx:key="id" class="initial-action"><view><text>{{item.name}}</text><text>{{item.domainName}} · {{item.minutes}} 分钟</text></view><view><text data-id="{{item.id}}" bindtap="editAction">修改</text><text data-id="{{item.id}}" bindtap="removeAction">移除</text></view></view>
+      </view>
+      <button class="secondary-btn add-initial" bindtap="addAction">＋ 补充一个行动</button>
+    </view>
+
+    <button class="primary-btn next-btn" bindtap="next">{{step === 3 ? '开始看看生活' : '继续'}}</button>
   </view>
 </view>

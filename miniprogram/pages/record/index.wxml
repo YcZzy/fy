@@ -3,7 +3,12 @@
   <view class="hero-title">{{action.name}}</view>
   <view class="hero-subtitle">记多少都可以，也可以轻轻跳过。</view>
 
-  <view class="section glass-card card-pad">
+  <view class="section">
+    <view class="section-title small">后来怎么样</view>
+    <view class="chips completion-chips"><view wx:for="{{completions}}" wx:key="value" class="chip {{completion === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectCompletion">{{item.label}}</view></view>
+  </view>
+
+  <view wx:if="{{completion !== 'not_started'}}" class="section glass-card card-pad">
     <view class="section-title small">大约多久</view>
     <view class="chips duration-chips">
       <view wx:for="{{durations}}" wx:key="label" class="chip {{minutes === item.value ? 'active' : ''}}" data-value="{{item.value === null ? 'none' : item.value}}" bindtap="selectDuration">{{item.label}}</view>

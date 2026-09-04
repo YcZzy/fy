@@ -1,5 +1,5 @@
 .hero-row { display: flex; justify-content: space-between; gap: 24rpx; }
-.settings { width: 74rpx; height: 62rpx; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 34rpx; background: rgba(255,255,255,.55); border-radius: 50%; }
+.settings { width: 62rpx; height: 62rpx; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 34rpx; background: rgba(255,255,255,.55); border-radius: 50%; }
 .active-card { margin-top: 28rpx; padding: 24rpx 26rpx; background: rgba(45,41,37,.92); color: #fffaf3; }
 .active-dot { display: inline-block; width: 12rpx; height: 12rpx; margin-right: 12rpx; border-radius: 50%; background: #d5b783; }
 .active-label { color: rgba(255,250,243,.68); font-size: 22rpx; }
@@ -12,6 +12,7 @@
 .focus-top { display: flex; align-items: center; justify-content: space-between; }
 .focus-count { color: var(--muted); font-size: 22rpx; }
 .focus-name { margin-top: 24rpx; font-size: 33rpx; font-weight: 630; }
+.focus-last { margin-top: 12rpx; color: var(--ink); font-size: 23rpx; }
 .focus-meta { margin-top: 10rpx; color: var(--muted); font-size: 23rpx; }
 .small-action { width: 100%; margin-top: 25rpx; padding-top: 20rpx; text-align: left; color: var(--caramel-deep); background: transparent; border-top: 1rpx solid rgba(93,74,58,.08); font-size: 25rpx; }
 .field-label.first { margin-top: 0; }

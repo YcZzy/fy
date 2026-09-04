@@ -27,7 +27,13 @@ async function persistPhoto(tempFilePath, footprintId) {
 
 async function deleteCloudFiles(fileIds) {
   if (!isReady() || !fileIds || !fileIds.length) return
-  await wx.cloud.deleteFile({ fileList: fileIds })
+  const result = await wx.cloud.deleteFile({ fileList: fileIds })
+  const failed = (result.fileList || []).filter((item) => Number(item.status) !== 0)
+  if (failed.length) {
+    const error = new Error('CLOUD_FILE_DELETE_INCOMPLETE')
+    error.details = failed
+    throw error
+  }
 }
 
 async function flushPendingDeletes() {
@@ -48,7 +54,13 @@ async function getPhotoUrls(fileIds) {
 
 async function deleteAllPersonalData() {
   if (!isReady()) return { localOnly: true }
-  return wx.cloud.callFunction({ name: 'dataManager', data: { action: 'deleteAll', confirm: 'DELETE_MY_DATA' } })
+  const response = await wx.cloud.callFunction({ name: 'dataManager', data: { action: 'deleteAll', confirm: 'DELETE_MY_DATA' } })
+  if (!response.result || response.result.code !== 0 || response.result.deleted !== true) {
+    const error = new Error('CLOUD_DELETE_INCOMPLETE')
+    error.details = response.result && response.result.failures
+    throw error
+  }
+  return response.result
 }
 
 module.exports = { isReady, isSyncReady, persistPhoto, deleteCloudFiles, flushPendingDeletes, getPhotoUrls, deleteAllPersonalData }

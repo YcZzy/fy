@@ -21,6 +21,11 @@ files.filter((file) => file.endsWith('.json')).forEach((file) => JSON.parse(fs.r
 files.filter((file) => file.endsWith('.js')).forEach((file) => execFileSync(process.execPath, ['--check', file], { stdio: 'pipe' }))
 
 const wxml = files.filter((file) => file.endsWith('.wxml')).map((file) => fs.readFileSync(file, 'utf8')).join('\n')
+const javascript = files.filter((file) => file.endsWith('.js')).map((file) => fs.readFileSync(file, 'utf8')).join('\n')
+const privateInfos = new Set(app.requiredPrivateInfos || [])
+for (const api of ['chooseLocation', 'chooseMedia']) {
+  if (javascript.includes(`wx.${api}(`) && !privateInfos.has(api)) throw new Error(`使用 wx.${api} 时 requiredPrivateInfos 必须声明 ${api}`)
+}
 for (const forbidden of ['.includes(', '.slice(', '.map(']) {
   if (wxml.includes(forbidden)) throw new Error(`WXML 中包含不支持的方法调用: ${forbidden}`)
 }

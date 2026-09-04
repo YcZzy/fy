@@ -1,5 +1,6 @@
 .section-title.small { font-size: 28rpx; }
 .duration-chips { margin-top: 22rpx; }
+.completion-chips { margin-top: 20rpx; }
 .custom-duration { display: flex; align-items: center; gap: 12rpx; margin-top: 22rpx; color: var(--muted); font-size: 24rpx; }
 .custom-duration input { width: 170rpx; padding: 16rpx 20rpx; border-radius: 18rpx; background: rgba(234,225,213,.45); color: var(--ink); }
 .feeling-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx; margin-top: 20rpx; }

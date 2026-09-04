@@ -4,6 +4,7 @@ const repository = require('./services/repository')
 App({
   globalData: {
     cloudReady: false,
+    cloudConfigured: false,
     envId: env.CLOUD_ENV_ID
   },
 
@@ -11,7 +12,7 @@ App({
     repository.ensureState()
     if (env.CLOUD_ENV_ID && wx.cloud) {
       wx.cloud.init({ env: env.CLOUD_ENV_ID, traceUser: true })
-      this.globalData.cloudReady = true
+      this.globalData.cloudConfigured = true
       if (env.ENABLE_CLOUD_SYNC) {
         this.initializeCloudData()
       }
@@ -32,11 +33,21 @@ App({
     } catch (error) {
       console.warn('集合自动初始化未完成，将尝试同步已有集合', error)
     }
-    require('./services/sync').bootstrap().catch((error) => console.warn('云端初始化同步未完成', error))
+    try {
+      await require('./services/sync').bootstrap()
+      this.globalData.cloudReady = true
+    } catch (error) {
+      this.globalData.cloudReady = false
+      console.warn('云端初始化同步未完成', error)
+    }
   },
 
   onShow() {
     repository.reconcileActiveSession()
-    if (this.globalData.cloudReady) require('./services/cloud').flushPendingDeletes().catch((error) => console.warn('待清理照片稍后重试', error))
+    if (this.globalData.cloudConfigured) require('./services/cloud').flushPendingDeletes().catch((error) => console.warn('待清理照片稍后重试', error))
+  },
+
+  onHide() {
+    repository.markPendingActionBackgrounded()
   }
 })

@@ -3,9 +3,10 @@
 .topline { display: flex; justify-content: space-between; align-items: center; }
 .brand { font-size: 26rpx; font-weight: 650; letter-spacing: 4rpx; }
 .progress { margin-top: 34rpx; width: 100%; height: 4rpx; background: rgba(93,74,58,.08); border-radius: 4rpx; overflow: hidden; }
-.progress-fill { height: 100%; width: 33.333%; background: var(--caramel); transition: width .3s ease; }
-.progress-fill.step-1 { width: 66.666%; }
-.progress-fill.step-2 { width: 100%; }
+.progress-fill { height: 100%; width: 25%; background: var(--caramel); transition: width .3s ease; }
+.progress-fill.step-1 { width: 50%; }
+.progress-fill.step-2 { width: 75%; }
+.progress-fill.step-3 { width: 100%; }
 .stage { flex: 1; padding-top: 88rpx; animation: rise .45s ease both; }
 .welcome-stage { padding-top: 78rpx; }
 .moon-mark { position: relative; width: 116rpx; height: 116rpx; margin-bottom: 44rpx; border-radius: 50%; background: linear-gradient(145deg, #d9b980, #b97850); box-shadow: 0 20rpx 48rpx rgba(185,120,80,.25); }
@@ -16,8 +17,19 @@
 .stage-title { margin-top: 20rpx; }
 .interest-list { margin-top: 46rpx; }
 .interest { padding: 20rpx 28rpx; }
+.custom-interest { display: flex; align-items: center; gap: 16rpx; margin-top: 24rpx; padding: 12rpx 18rpx; border-radius: 20rpx; background: rgba(255,255,255,.55); }
+.custom-interest input { flex: 1; }
+.custom-interest button { margin: 0; }
 .wish-card { margin-top: 54rpx; padding: 28rpx; }
 .wish-input { width: 100%; height: 210rpx; line-height: 1.7; }
 .wish-note { color: var(--muted); font-size: 23rpx; text-align: right; }
 .next-btn { margin-top: 38rpx; }
+.action-stage { padding-top: 54rpx; }
+.initial-actions { margin-top: 30rpx; overflow: hidden; }
+.initial-action { display: flex; justify-content: space-between; align-items: center; gap: 20rpx; padding: 21rpx 24rpx; border-bottom: 1rpx solid rgba(93,74,58,.08); }
+.initial-action:last-child { border-bottom: 0; }
+.initial-action>view:first-child { display: flex; flex-direction: column; gap: 6rpx; }
+.initial-action>view:first-child text:last-child { color: var(--muted); font-size: 21rpx; }
+.initial-action>view:last-child { display: flex; gap: 18rpx; color: var(--caramel-deep); font-size: 22rpx; }
+.add-initial { width: 100%; margin-top: 18rpx; }
 @keyframes rise { from { opacity: 0; transform: translateY(18rpx); } to { opacity: 1; transform: translateY(0); } }

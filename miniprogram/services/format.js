@@ -22,7 +22,7 @@ function greeting() {
   if (hour < 6) return '夜深了，慢一点也很好'
   if (hour < 11) return '早上好，给今天留一点余地'
   if (hour < 14) return '中午好，歇一会儿吧'
-  if (hour < 18) return '下午好，这段时间还没有名字'
+  if (hour < 18) return '下午好，放慢呼吸，让阳光正好穿过'
   return '晚上好，把空闲还给生活'
 }
 function uid(prefix) { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` }

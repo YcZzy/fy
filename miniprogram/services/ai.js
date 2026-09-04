@@ -32,7 +32,8 @@ async function recommend(state, context) {
     actions: state.actions.filter((item) => !item.hidden).map(({ id, name, domainId, minutes, energy, environments, preparation, planId }) => ({ id, name, domainId, minutes, energy, environments, preparation, planId })),
     focusedPlans: state.plans.filter((item) => item.focused).map(({ id, name, domainId }) => ({ id, name, domainId })),
     recent: state.footprints.slice(0, 8).map(({ actionId, actionName, minutes, feeling }) => ({ actionId, actionName, minutes, feeling })),
-    declinedActionIds: state.declinedActionIds.slice(-12)
+    selectedInterests: state.preferences.selectedInterests || [],
+    declinedActionIds: (state.declinedActions || []).filter((item) => item.declinedAt >= Date.now() - 2 * 60 * 60 * 1000).map((item) => item.actionId).slice(-12)
   }
   const system = '你是“风月为邻”的生活选择助手。语气温和、克制、略有诗意，但行动必须具体。娱乐与学习同等重要。不要评价、自律说教或虚构地点与用户经历。只返回 JSON：{"items":[{"name":"","domainId":"","minutes":30,"reason":"","planId":"","preparation":"","locationNote":""}]}。必须恰好 5 项，时长不得超过用户可用时间；未接入实时地点数据，只能推荐地点类别。'
   const result = await generate([{ role: 'system', content: system }, { role: 'user', content: JSON.stringify(compact) }])
@@ -43,7 +44,7 @@ async function recommend(state, context) {
 }
 
 async function chat(messages, contextSummary) {
-  const system = '你是“问风月”。温和、克制、略有诗意，但回答清楚具体，不说教、不诊断。娱乐和休息也是正常生活。若用户要求创建行动或计划，只提出草稿，绝不声称已保存。只返回 JSON：{"reply":"给用户的话","draft":null}；若有草稿，draft 为 {"type":"action或plan","name":"","domainId":"rest|health|learn|career|travel|connect|create|daily","minutes":30,"why":""}。'
+  const system = '你是“问风月”。温和、克制、略有诗意，但回答清楚具体，不说教、不诊断。娱乐和休息也是正常生活。若用户要求创建行动或计划，只提出草稿，绝不声称已保存。只返回 JSON：{"reply":"给用户的话","draft":null}；若有草稿，draft 为 {"type":"action或plan","name":"","domainId":"rest|health|learn|career|travel|connect|create|daily","minutes":30,"why":"","planId":"可选且必须来自摘要中的真实计划ID","preparation":""}。'
   const safeMessages = messages.slice(-12).map(({ role, content }) => ({ role, content }))
   const result = await generate([{ role: 'system', content: `${system}\n可用的非敏感摘要：${JSON.stringify(contextSummary)}` }, ...safeMessages])
   return { ...extractJson(result.text), usage: result.usage }

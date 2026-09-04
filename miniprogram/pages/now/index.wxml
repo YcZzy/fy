@@ -20,6 +20,7 @@
         <view wx:for="{{focusedPlans}}" wx:key="id" class="focus-card glass-card">
           <view class="focus-top"><text class="tag">最近关注</text><text class="focus-count">{{item.count}} 次</text></view>
           <view class="focus-name">{{item.name}}</view>
+          <view class="focus-last">最近：{{item.lastAction}}</view>
           <view class="focus-meta">{{item.duration}} · {{item.lastFeeling}}</view>
           <button class="small-action" data-id="{{item.id}}" bindtap="continuePlan">继续一下 <text>→</text></button>
         </view>

@@ -33,10 +33,15 @@ Page({
     const state = repository.getState()
     if (state.activeSession && state.activeSession.actionId !== this.data.action.id) { this.startTimer(); return }
     repository.startSession(this.data.action, 'timer', { reminder: true })
-    wx.showToast({ title: '到预计时间会提醒一次', icon: 'none' })
+    wx.showToast({ title: '停留在这里或下次回来时提醒', icon: 'none' })
     this.load()
   },
   direct() {
+    const state = repository.getState()
+    if (state.activeSession && state.activeSession.actionId !== this.data.action.id) {
+      wx.showModal({ title: '还有一件事正在计时', content: `先处理“${state.activeSession.actionName}”，再开始新的行动。`, confirmText: '去看看', success: (res) => { if (res.confirm) wx.redirectTo({ url: `/pages/action/index?id=${state.activeSession.actionId}` }) } })
+      return
+    }
     repository.startSession(this.data.action, 'direct')
     wx.showToast({ title: '去吧，回来时再记一笔', icon: 'none' })
     setTimeout(() => wx.navigateBack(), 900)

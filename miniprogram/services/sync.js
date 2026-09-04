@@ -14,6 +14,7 @@ let pendingTimer = null
 let syncing = false
 let latestState = null
 const pendingCollections = new Set()
+let retryAttempt = 0
 
 function enabled() { return Boolean(env.CLOUD_ENV_ID && env.ENABLE_CLOUD_SYNC && wx.cloud) }
 function clean(doc) {
@@ -23,8 +24,16 @@ function clean(doc) {
   return value
 }
 async function ownDocuments(collection) {
-  const result = await wx.cloud.database().collection(collection).where({ _openid: '{openid}' }).limit(100).get()
-  return result.data || []
+  const records = []
+  let offset = 0
+  while (true) {
+    const result = await wx.cloud.database().collection(collection).where({ _openid: '{openid}' }).skip(offset).limit(100).get()
+    const page = result.data || []
+    records.push(...page)
+    if (page.length < 100) break
+    offset += page.length
+  }
+  return records
 }
 async function syncCollection(collection, items) {
   const ref = wx.cloud.database().collection(collection)
@@ -75,12 +84,19 @@ async function push() {
   const collections = [...pendingCollections]
   pendingCollections.clear()
   syncing = true
+  let succeeded = false
   try {
     const data = snapshot(state)
     for (const collection of collections) await syncCollection(collection, data[collection] || [])
+    retryAttempt = 0
+    succeeded = true
+  } catch (error) {
+    collections.forEach((collection) => pendingCollections.add(collection))
+    retryAttempt += 1
+    throw error
   } finally {
     syncing = false
-    if (pendingCollections.size) armTimer(0)
+    if (pendingCollections.size) armTimer(succeeded ? 0 : Math.min(30000, 1000 * Math.pow(2, retryAttempt)))
   }
 }
 function armTimer(delay = 900) {
@@ -106,12 +122,12 @@ async function bootstrap() {
   if (!response.result || response.result.code !== 0) throw new Error('CLOUD_SNAPSHOT_LOAD_FAILED')
   const byName = response.result.data || {}
   const preferences = byName.user_preferences || []
-  if (preferences.length) { local.preferences = clean(preferences[0]); delete local.preferences.localId; delete local.preferences.syncedAt; foundRemote = true }
-  for (const key of Object.keys(COLLECTIONS)) {
-    const docs = byName[COLLECTIONS[key]] || []
-    if (docs.length) {
+  foundRemote = preferences.length > 0 || Object.values(COLLECTIONS).some((name) => (byName[name] || []).length > 0)
+  if (foundRemote) {
+    if (preferences.length) { local.preferences = clean(preferences[0]); delete local.preferences.localId; delete local.preferences.syncedAt }
+    for (const key of Object.keys(COLLECTIONS)) {
+      const docs = byName[COLLECTIONS[key]] || []
       local[key] = docs.map((item) => { const value = clean(item); delete value.localId; delete value.syncedAt; return value })
-      foundRemote = true
     }
   }
   // 云端恢复只落本地，不能再次触发全量回写。
@@ -119,4 +135,4 @@ async function bootstrap() {
   else schedule(local, names)
 }
 
-module.exports = { schedule, bootstrap, sameDocument }
+module.exports = { schedule, bootstrap, sameDocument, ownDocuments }

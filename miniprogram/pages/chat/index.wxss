@@ -31,6 +31,6 @@
 .scroll-spacer { height: 36rpx; }
 .composer { display: flex; align-items: flex-end; gap: 14rpx; padding: 18rpx 24rpx calc(env(safe-area-inset-bottom) + 18rpx); background: rgba(251,247,241,.94); border-top: 1rpx solid rgba(93,74,58,.07); backdrop-filter: blur(16rpx); }
 .composer textarea { flex: 1; max-height: 160rpx; padding: 19rpx 22rpx; box-sizing: border-box; border-radius: 25rpx; background: #fff; line-height: 1.5; }
-.send-btn { width: 74rpx; height: 74rpx; flex: 0 0 74rpx; color: #fff; background: var(--caramel); font-size: 34rpx; }
+.send-btn { width: 74rpx; height: 74rpx; line-height: 74rpx; flex: 0 0 74rpx; color: #fff; background: var(--caramel); font-size: 34rpx; }
 .send-btn[disabled] { opacity: .38; }
 @keyframes dot { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-5rpx); } }

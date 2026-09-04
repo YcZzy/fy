@@ -8,6 +8,7 @@
     "pages/record/index",
     "pages/chat/index",
     "pages/plan/index",
+    "pages/action-editor/index",
     "pages/settings/index"
   ],
   "window": {

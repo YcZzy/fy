@@ -1,0 +1,5 @@
+.field-label.first { margin-top: 0; }
+.picker-value { display: flex; justify-content: space-between; padding: 22rpx 24rpx; border-radius: 22rpx; background: rgba(255,255,255,.62); border: 1rpx solid rgba(93,74,58,.1); }
+.minutes-input { display: flex; align-items: center; gap: 12rpx; color: var(--muted); }
+.minutes-input input { width: 180rpx; padding: 18rpx 20rpx; border-radius: 18rpx; background: rgba(255,255,255,.62); }
+.save-action, .delete-action { width: 100%; margin-top: 24rpx; }

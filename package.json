@@ -2,5 +2,5 @@
   "name": "feng-yue-wei-lin",
   "version": "0.1.0",
   "private": true,
-  "scripts": { "check": "node scripts/validate.js && node scripts/test-repository.js && node scripts/test-sync.js" }
+  "scripts": { "check": "node scripts/validate.js && node scripts/test-repository.js && node scripts/test-recommender.js && node scripts/test-sync.js" }
 }

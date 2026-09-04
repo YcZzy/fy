@@ -7,14 +7,25 @@ const PERIODS = [{ label: '本周', value: 'week' }, { label: '本月', value: '
 
 Page({
   data: { tab: 'timeline', footprints: [], periods: PERIODS, period: 'week', startDate: '', endDate: '', stats: null, reviews: [], reviewing: false },
-  onShow() { this.refresh(); this.maybePromptWeeklyReview() },
+  onShow() {
+    const state = repository.getState()
+    if (state.preferences.openReviewOnNextShow) {
+      repository.update((value) => { value.preferences.openReviewOnNextShow = false })
+      this.setData({ tab: 'review' })
+    }
+    this.refresh()
+  },
   async refresh() {
     const state = repository.getState()
     const fileIds = state.footprints.reduce((all, item) => all.concat(item.photoFileIds || []), [])
     let urls = {}
     try { urls = await cloud.getPhotoUrls(fileIds) } catch (error) { console.warn('照片临时地址获取失败', error) }
-    const footprints = state.footprints.map((item) => ({ ...item, dateLabel: format.dateLabel(item.createdAt), durationLabel: format.duration(item.minutes), photo: (item.localPhotoPaths && item.localPhotoPaths[0]) || ((item.photoFileIds && item.photoFileIds[0]) ? urls[item.photoFileIds[0]] : '') }))
-    this.setData({ footprints, reviews: state.reviews }, () => this.calculateStats())
+    const completionLabels = { done: '', partial: '做了一部分', not_started: '最后没做' }
+    const footprints = state.footprints.map((item) => {
+      const plan = state.plans.find((value) => value.id === item.planId)
+      return { ...item, planName: plan ? plan.name : '', dateLabel: format.dateLabel(item.createdAt), durationLabel: format.duration(item.minutes), completionLabel: completionLabels[item.completionStatus] || '', photo: (item.localPhotoPaths && item.localPhotoPaths[0]) || ((item.photoFileIds && item.photoFileIds[0]) ? urls[item.photoFileIds[0]] : '') }
+    })
+    this.setData({ footprints }, () => this.calculateStats())
   },
   setTab(event) { this.setData({ tab: event.currentTarget.dataset.value }, () => { if (this.data.tab === 'review') this.calculateStats() }) },
   setPeriod(event) { this.setData({ period: event.currentTarget.dataset.value }, () => this.calculateStats()) },
@@ -46,12 +57,14 @@ Page({
     const domains = Object.values(byDomain).sort((a, b) => b.minutes - a.minutes).map((item) => ({ ...item, duration: format.duration(item.minutes) }))
     const favorite = Object.keys(byAction).sort((a, b) => byAction[b] - byAction[a])[0] || '还没有反复出现的事情'
     this.currentRangeItems = all
-    this.setData({ stats: { count: all.length, totalDuration: format.duration(totalMinutes), domains, feelings, favorite } })
+    const reviews = repository.getState().reviews.filter((item) => item.period === this.data.period)
+    this.setData({ stats: { count: all.length, totalDuration: format.duration(totalMinutes), domains, feelings, favorite }, reviews })
   },
   editFootprint(event) {
     const item = repository.getState().footprints.find((footprint) => footprint.id === event.currentTarget.dataset.id)
     if (item) wx.navigateTo({ url: `/pages/record/index?footprintId=${item.id}&actionId=${item.actionId}&mode=edit` })
   },
+  openPlan(event) { wx.navigateTo({ url: `/pages/plan/index?id=${event.currentTarget.dataset.id}` }) },
   deleteFootprint(event) {
     const id = event.currentTarget.dataset.id
     const item = repository.getState().footprints.find((footprint) => footprint.id === id)
@@ -64,6 +77,7 @@ Page({
     } })
   },
   async generateReview() {
+    if (this.data.period === 'custom' && (!this.data.startDate || !this.data.endDate || this.data.startDate > this.data.endDate)) { wx.showToast({ title: '请选择有效的日期范围', icon: 'none' }); return }
     if (!this.currentRangeItems.length) { wx.showToast({ title: '先留下一点足迹吧', icon: 'none' }); return }
     this.setData({ reviewing: true })
     let content = ''
@@ -75,21 +89,24 @@ Page({
       content = `这段时间留下了 ${stats.count} 次足迹，共有 ${stats.totalDuration}。${stats.domains.length ? `时间更多地流向了${stats.domains.slice(0,2).map((item) => item.name).join('和')}。` : ''}最常出现的是“${stats.favorite}”。不必急着从中得到答案，能看见这些选择已经很好。`
       wx.showToast({ title: '风暂时没有回音，已生成基础回顾', icon: 'none' })
     }
-    repository.saveReview({ period: this.data.period, content, startDate: this.data.startDate, endDate: this.data.endDate })
+    const { start, end } = this.range()
+    repository.saveReview({ period: this.data.period, content, startDate: this.data.startDate, endDate: this.data.endDate, rangeStart: start, rangeEnd: end })
     this.setData({ reviewing: false }); this.refresh()
   },
   deleteReview(event) {
     const id = event.currentTarget.dataset.id
-    repository.update((state) => { state.reviews = state.reviews.filter((item) => item.id !== id) })
-    this.refresh()
+    wx.showModal({ title: '删除这段回顾？', content: '足迹仍会保留，只删除这段回顾文字。', confirmText: '删除', confirmColor: '#A85F50', success: (res) => {
+      if (!res.confirm) return
+      repository.deleteReview(id); this.refresh()
+    } })
   },
-  maybePromptWeeklyReview() {
-    const now = new Date()
-    if (now.getDay() !== 0 || now.getHours() < 18) return
-    const key = format.dateKey(now.getTime())
-    const state = repository.getState()
-    if (state.preferences.weeklyPromptKey === key) return
-    repository.update((value) => { value.preferences.weeklyPromptKey = key })
-    wx.showModal({ title: '这一周，要不要回头看看？', content: '不着急，也可以之后从“足迹—回望”再来。', confirmText: '去回望', cancelText: '以后再说', success: (res) => { if (res.confirm) this.setData({ tab: 'review' }, () => this.calculateStats()) } })
+  editReview(event) {
+    const id = event.currentTarget.dataset.id
+    const review = repository.getState().reviews.find((item) => item.id === id)
+    if (!review) return
+    wx.showModal({ title: '修改这段回顾', editable: true, content: review.content, confirmText: '保存', success: (res) => {
+      if (!res.confirm || !res.content.trim()) return
+      repository.updateReview(id, res.content.trim()); this.refresh()
+    } })
   }
 })

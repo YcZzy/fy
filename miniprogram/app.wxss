@@ -82,9 +82,10 @@ button::after { border: 0; }
 .field-label { margin: 26rpx 0 14rpx; font-size: 25rpx; font-weight: 600; }
 .input, .textarea {
   box-sizing: border-box; width: 100%; color: var(--ink); background: rgba(255,255,255,.62);
-  border: 1rpx solid rgba(93,74,58,.10); border-radius: 22rpx; padding: 22rpx 24rpx;
+  border: 1rpx solid rgba(93,74,58,.10); border-radius: 22rpx;
 }
-.textarea { min-height: 164rpx; line-height: 1.6; }
+.input { height: 2.6rem; padding: 0 22rpx; }
+.textarea { min-height: 164rpx; line-height: 1.6; padding: 22rpx 24rpx; }
 .placeholder { color: #aaa197; }
 .tag { display: inline-flex; align-items: center; padding: 8rpx 14rpx; border-radius: 999rpx; font-size: 21rpx; color: var(--olive); background: rgba(117,128,107,.11); }
 .divider { height: 1rpx; margin: 24rpx 0; background: rgba(93,74,58,.08); }

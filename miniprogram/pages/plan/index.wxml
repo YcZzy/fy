@@ -12,4 +12,25 @@
     <view class="field-label">重要日期（选填）</view><picker mode="date" value="{{plan.importantDate}}" bindchange="onDate"><view class="picker-value muted-value">{{plan.importantDate || '选择日期'}} <text>⌄</text></view></picker>
   </view>
   <button class="primary-btn save-plan" bindtap="save">保存计划</button>
+
+  <view wx:if="{{!isNew}}" class="section">
+    <view class="section-title">这段经历</view>
+    <view class="plan-stats glass-card"><view><text>{{stats.count}}</text><text>次足迹</text></view><view class="stats-line"></view><view><text class="duration">{{stats.duration}}</text><text>累计时长</text></view></view>
+    <view class="plan-feelings"><text>感受</text><text>晴 {{stats.feelings.love}}</text><text>暖 {{stats.feelings.good}}</text><text>平 {{stats.feelings.okay}}</text><text>淡 {{stats.feelings.poor}}</text></view>
+  </view>
+
+  <view wx:if="{{!isNew}}" class="section">
+    <view class="section-head"><view><text class="section-title">可以继续的行动</text><text class="section-note">适合首页当前状态的排在前面</text></view><button class="ghost-btn" bindtap="addAction">＋ 添加</button></view>
+    <view wx:if="{{actions.length}}" class="related-list solid-card"><view wx:for="{{actions}}" wx:key="id" class="related-row"><view data-id="{{item.id}}" bindtap="openAction"><text>{{item.name}}</text><text>{{item.minutes}} 分钟 · {{item.domainName}}<text wx:if="{{item.suitableNow}}" class="suitable"> · 适合此刻</text></text></view><text data-id="{{item.id}}" bindtap="editAction">编辑</text></view></view>
+    <view wx:else class="empty glass-card">这个计划还没有行动。先添一件容易开始的事。</view>
+    <button class="secondary-btn ask-next" bindtap="askNext">请风月想几个下一步</button>
+  </view>
+
+  <view wx:if="{{!isNew}}" class="section">
+    <view class="section-head"><text class="section-title">最近足迹</text><text class="section-note">只展示最近五次</text></view>
+    <view wx:if="{{footprints.length}}" class="related-list solid-card"><view wx:for="{{footprints}}" wx:key="id" class="footprint-row"><view><text>{{item.actionName}}</text><text>{{item.dateLabel}} · {{item.durationLabel}}</text></view><text>{{item.feelingLabel}}</text></view></view>
+    <view wx:else class="empty">还没有足迹。</view>
+  </view>
+
+  <view wx:if="{{!isNew}}" class="section reflection glass-card" bindtap="reflect"><text class="section-title">回头看看</text><text>{{plan.reflection || '写下最近的感受，不需要得出答案。'}}</text><text class="chevron">›</text></view>
 </view></view>

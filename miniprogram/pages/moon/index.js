@@ -4,7 +4,7 @@ const format = require('../../services/format')
 const FILTERS = [{ label: '全部', value: 'all' }, { label: '进行中', value: 'active' }, { label: '想做', value: 'want' }, { label: '暂停', value: 'paused' }, { label: '已结束', value: 'ended' }]
 
 Page({
-  data: { filters: FILTERS, filter: 'all', plans: [], focusedPlans: [], wishes: [], domains: [], actions: [], showActions: false },
+  data: { filters: FILTERS, filter: 'all', plans: [], focusedPlans: [], wishes: [], domains: [], actions: [], showActions: false, actionQuery: '', actionDomainId: '' },
   onShow() { this.refresh() },
   refresh() {
     const state = repository.getState()
@@ -14,7 +14,11 @@ Page({
     }
     const plans = state.plans.filter((item) => this.data.filter === 'all' || item.status === this.data.filter).map(decorate)
     const domains = state.domains.filter((item) => !item.hidden).map((domain) => ({ ...domain, actionCount: state.actions.filter((item) => !item.hidden && item.domainId === domain.id).length }))
-    const actions = state.actions.filter((item) => !item.hidden).map((action) => ({ ...action, domainName: (state.domains.find((item) => item.id === action.domainId) || {}).name || '生活' }))
+    const query = this.data.actionQuery.trim().toLowerCase()
+    const actions = state.actions.filter((item) => !item.hidden)
+      .filter((item) => !this.data.actionDomainId || item.domainId === this.data.actionDomainId)
+      .filter((item) => !query || item.name.toLowerCase().includes(query))
+      .map((action) => ({ ...action, domainName: (state.domains.find((item) => item.id === action.domainId) || {}).name || '生活' }))
     this.setData({ plans, focusedPlans: state.plans.filter((item) => item.focused && item.status !== 'ended').map(decorate), wishes: state.wishes, domains, actions })
   },
   statusLabel(value) { return ({ active: '进行中', want: '想做', paused: '暂停', ended: '已结束' })[value] || '想做' },
@@ -36,13 +40,15 @@ Page({
     }
   },
   toggleActions() { this.setData({ showActions: !this.data.showActions }) },
-  addAction() {
-    wx.showModal({ title: '添加一个具体行动', editable: true, placeholderText: '例如：下楼散步 20 分钟', confirmText: '添加', success: (res) => {
-      if (!res.confirm || !res.content.trim()) return
-      repository.saveAction({ name: res.content.trim(), domainId: 'daily', minutes: 30 })
-      this.setData({ showActions: true }); this.refresh()
-    } })
+  addAction() { wx.navigateTo({ url: '/pages/action-editor/index' }) },
+  openAction(event) { wx.navigateTo({ url: `/pages/action/index?id=${event.currentTarget.dataset.id}` }) },
+  editAction(event) { wx.navigateTo({ url: `/pages/action-editor/index?id=${event.currentTarget.dataset.id}` }) },
+  onActionSearch(event) { this.setData({ actionQuery: event.detail.value, showActions: true }, () => this.refresh()) },
+  filterDomain(event) {
+    const id = event.currentTarget.dataset.id
+    this.setData({ actionDomainId: this.data.actionDomainId === id ? '' : id, showActions: true }, () => this.refresh())
   },
+  clearActionFilters() { this.setData({ actionQuery: '', actionDomainId: '' }, () => this.refresh()) },
   hideAction(event) {
     const id = event.currentTarget.dataset.id
     wx.showModal({ title: '从行动库隐藏？', content: '历史足迹不会被删除。', confirmText: '隐藏', confirmColor: '#A85F50', success: (res) => { if (res.confirm) { repository.hideAction(id); this.refresh() } } })

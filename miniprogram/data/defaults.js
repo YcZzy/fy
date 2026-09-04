@@ -36,7 +36,7 @@ const PLANS = [
 function createInitialState() {
   const now = Date.now()
   return {
-    version: 2,
+    version: 3,
     preferences: {
       onboardingComplete: false,
       selectedInterests: [],
@@ -54,7 +54,7 @@ function createInitialState() {
     activeSession: null,
     pendingAction: null,
     recommendationCache: null,
-    declinedActionIds: [],
+    declinedActions: [],
     pendingFileDeletes: [],
     syncQueue: []
   }

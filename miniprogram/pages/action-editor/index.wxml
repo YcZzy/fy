@@ -1,0 +1,17 @@
+<view class="page editor-page"><view class="page-content" wx:if="{{action}}">
+  <text class="eyebrow">{{isNew ? '添一件可以开始的事' : '修改行动'}}</text>
+  <view class="hero-title">让它具体一点</view>
+  <view class="hero-subtitle">时间、精力和环境越准确，推荐越贴近此刻。</view>
+
+  <view class="section glass-card card-pad">
+    <view class="field-label first">行动名称</view><input class="input" maxlength="30" value="{{action.name}}" placeholder="例如：下楼散步 20 分钟" bindinput="onName"/>
+    <view class="field-label">预计时间</view><view class="minutes-input"><input type="number" maxlength="3" value="{{action.minutes}}" bindinput="onMinutes"/><text>分钟</text></view>
+    <view class="field-label">所属板块</view><picker mode="selector" range="{{domains}}" range-key="name" value="{{domainIndex}}" bindchange="onDomain"><view class="picker-value">{{domains[domainIndex].name}} <text>⌄</text></view></picker>
+    <view class="field-label">什么状态适合做</view><view class="chips"><view wx:for="{{energies}}" wx:key="value" class="chip {{energyMap[item.value] ? 'active' : ''}}" data-value="{{item.value}}" bindtap="toggleEnergy">{{item.label}}</view></view>
+    <view class="field-label">在哪里适合做</view><view class="chips"><view wx:for="{{environments}}" wx:key="value" class="chip {{environmentMap[item.value] ? 'active' : ''}}" data-value="{{item.value}}" bindtap="toggleEnvironment">{{item.label}}</view></view>
+    <view class="field-label">关联计划</view><picker mode="selector" range="{{plans}}" range-key="name" value="{{planIndex}}" bindchange="onPlan"><view class="picker-value">{{plans[planIndex].name}} <text>⌄</text></view></picker>
+    <view class="field-label">需要准备</view><input class="input" maxlength="60" value="{{action.preparation}}" placeholder="例如：耳机或一双舒服的鞋" bindinput="onPreparation"/>
+  </view>
+  <button class="primary-btn save-action" bindtap="save">保存行动</button>
+  <button wx:if="{{!isNew && action.source !== 'system'}}" class="danger-btn delete-action" bindtap="remove">删除行动</button>
+</view></view>

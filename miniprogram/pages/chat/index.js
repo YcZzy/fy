@@ -7,6 +7,7 @@ const QUICK = ['此刻做什么', '展开一个想法', '帮我建个计划', '�
 Page({
   data: { messages: [], input: '', quick: QUICK, history: [], sending: false, draft: null, scrollInto: '' },
   onLoad(options) {
+    this.planId = options.planId || ''
     const state = repository.getState()
     this.conversation = { id: format.uid('c'), title: '一段新对话', messages: [], createdAt: Date.now(), updatedAt: Date.now() }
     this.setData({ history: state.conversations.slice(0, 6) })
@@ -25,12 +26,14 @@ Page({
       const contextSummary = {
         domains: state.domains.filter((item) => !item.hidden).map(({ id, name }) => ({ id, name })),
         focusedPlans: state.plans.filter((item) => item.focused).map(({ id, name }) => ({ id, name })),
+        plans: state.plans.filter((item) => item.status !== 'ended').slice(0, 20).map(({ id, name, domainId }) => ({ id, name, domainId })),
         wishes: state.wishes.slice(0, 8).map((item) => item.text),
         recentFootprints: state.footprints.slice(0, 8).map(({ actionName, minutes, feelingLabel }) => ({ actionName, minutes, feelingLabel }))
       }
       const result = await ai.chat(messages, contextSummary)
       const assistant = { id: format.uid('m'), role: 'assistant', content: result.reply || '这一刻可以先不急着回答。', createdAt: Date.now() }
-      this.finishMessage([...messages, assistant], result.draft || null)
+      const draft = result.draft && result.draft.type === 'action' && this.planId ? { ...result.draft, planId: this.planId } : result.draft
+      this.finishMessage([...messages, assistant], draft || null)
     } catch (error) {
       console.warn('AI 对话不可用', error)
       const assistant = { id: format.uid('m'), role: 'assistant', content: '风暂时没有回音。你仍然可以从“此刻”的已有行动里选一件，或者先把这个念头留在想做清单里。', createdAt: Date.now(), failed: true }
@@ -51,7 +54,7 @@ Page({
     if (draft.type === 'plan') {
       repository.savePlan({ name: draft.name || '一段新体验', why: draft.why || '', domainId: draft.domainId || 'daily', status: 'want', focused: false })
     } else {
-      repository.saveAction({ name: draft.name || '一个新行动', domainId: draft.domainId || 'daily', minutes: Math.max(5, Number(draft.minutes) || 30) })
+      repository.saveAction({ name: draft.name || '一个新行动', domainId: draft.domainId || 'daily', minutes: Math.max(5, Number(draft.minutes) || 30), planId: draft.planId || '' })
     }
     this.setData({ draft: null })
     wx.showToast({ title: '确认后已保存', icon: 'success' })
@@ -60,14 +63,12 @@ Page({
     const draft = this.data.draft
     if (!draft) return
     if (draft.type === 'plan') {
+      this.setData({ draft: null })
       wx.navigateTo({ url: `/pages/plan/index?draft=${encodeURIComponent(JSON.stringify(draft))}` })
       return
     }
-    wx.showModal({ title: '修改行动草稿', editable: true, content: draft.name || '', placeholderText: '行动名称', confirmText: '修改后保存', success: (res) => {
-      if (!res.confirm || !res.content.trim()) return
-      repository.saveAction({ name: res.content.trim(), domainId: draft.domainId || 'daily', minutes: Math.max(5, Number(draft.minutes) || 30) })
-      this.setData({ draft: null }); wx.showToast({ title: '已保存', icon: 'success' })
-    } })
+    this.setData({ draft: null })
+    wx.navigateTo({ url: `/pages/action-editor/index?draft=${encodeURIComponent(JSON.stringify(draft))}` })
   },
   discardDraft() { this.setData({ draft: null }) },
   messageMenu(event) {

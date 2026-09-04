@@ -41,6 +41,19 @@ async function removeOwned(collection, openid) {
   }
 }
 
+async function removeFiles(fileList) {
+  const failed = []
+  for (let index = 0; index < fileList.length; index += 50) {
+    const result = await cloud.deleteFile({ fileList: fileList.slice(index, index + 50) })
+    failed.push(...(result.fileList || []).filter((item) => Number(item.status) !== 0))
+  }
+  if (failed.length) {
+    const error = new Error('FILE_DELETE_INCOMPLETE')
+    error.details = failed
+    throw error
+  }
+}
+
 async function loadOwnedData(openid) {
   const results = await Promise.all(SYNC_COLLECTIONS.map(async (name) => {
     try { return { name, documents: await getAllOwned(name, openid) } }
@@ -63,9 +76,30 @@ exports.main = async (event) => {
   if (event.action === 'load') return loadOwnedData(OPENID)
   if (event.action !== 'deleteAll' || event.confirm !== 'DELETE_MY_DATA') throw new Error('INVALID_CONFIRMATION')
 
-  const footprints = await getAllOwned('footprints', OPENID).catch(() => [])
+  const failures = []
+  let footprints = []
+  let footprintsReadable = true
+  try { footprints = await getAllOwned('footprints', OPENID) }
+  catch (error) {
+    footprintsReadable = false
+    failures.push({ target: 'footprints_read', message: error && error.message ? error.message : String(error) })
+  }
   const fileList = footprints.reduce((all, item) => all.concat(item.photoFileIds || []), [])
-  if (fileList.length) await cloud.deleteFile({ fileList })
-  for (const collection of COLLECTIONS) await removeOwned(collection, OPENID).catch((error) => console.warn(`skip ${collection}`, error.message))
-  return { deleted: true, collections: COLLECTIONS.length, files: fileList.length }
+  let filesDeleted = true
+  if (fileList.length) {
+    try { await removeFiles(fileList) }
+    catch (error) {
+      filesDeleted = false
+      failures.push({ target: 'files', message: error && error.message ? error.message : String(error) })
+    }
+  }
+  // 只有确认照片已处理后才删除足迹文档，失败时保留文件 ID 以便下次重试。
+  const removableCollections = COLLECTIONS.filter((name) => name !== 'footprints')
+  if (footprintsReadable && filesDeleted) removableCollections.push('footprints')
+  for (const collection of removableCollections) {
+    try { await removeOwned(collection, OPENID) }
+    catch (error) { failures.push({ target: collection, message: error && error.message ? error.message : String(error) }) }
+  }
+  if (failures.length) return { code: -1, deleted: false, failures }
+  return { code: 0, deleted: true, collections: COLLECTIONS.length, files: fileList.length }
 }
