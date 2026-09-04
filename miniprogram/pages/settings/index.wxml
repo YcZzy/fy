@@ -1,0 +1,19 @@
+<view class="page settings-page"><view class="page-content">
+  <text class="eyebrow">你的数据，只属于你</text>
+  <view class="hero-title">设置与隐私</view>
+  <view class="hero-subtitle">位置按需申请；AI 只接收完成当前任务所需的生活摘要。</view>
+
+  <view class="section glass-card settings-group">
+    <view class="setting-row"><view><text class="setting-title">数据模式</text><text class="setting-sub">{{cloudReady ? 'CloudBase 已连接，本地仍保留可用副本' : '当前完整使用本地存储，配置环境后可启用云同步'}}</text></view><text class="status {{cloudReady ? 'ready' : ''}}">{{cloudReady ? '已连接' : '本地'}}</text></view>
+    <view class="setting-row"><view><text class="setting-title">CloudBase 环境</text><text class="setting-sub">{{envLabel}}</text></view></view>
+    <view class="setting-row" bindtap="openLocationSettings"><view><text class="setting-title">位置权限</text><text class="setting-sub">查看或修改微信位置授权</text></view><text class="chevron">›</text></view>
+  </view>
+
+  <view class="section"><view class="section-title">我的数据</view><view class="data-overview solid-card"><view><text>{{counts.plans}}</text><text>计划</text></view><view><text>{{counts.footprints}}</text><text>足迹</text></view><view><text>{{counts.conversations}}</text><text>AI 对话</text></view></view></view>
+
+  <view class="section glass-card settings-group">
+    <view class="setting-row" bindtap="clearChats"><view><text class="setting-title">清空全部 AI 对话</text><text class="setting-sub">不影响其他生活数据</text></view><text class="chevron">›</text></view>
+  </view>
+  <button class="danger-btn delete-all" bindtap="deleteAll">删除全部个人数据</button>
+  <view class="privacy-note">风月为邻不建立排名、成长分或娱乐超标判断。删除足迹时，会同时处理它的照片与位置。</view>
+</view></view>

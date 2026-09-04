@@ -1,0 +1,40 @@
+<view class="onboarding page">
+  <view class="page-content onboarding-inner">
+    <view class="topline">
+      <text class="brand">风月为邻</text>
+      <button class="ghost-btn" bindtap="skip">跳过</button>
+    </view>
+
+    <view class="progress"><view class="progress-fill step-{{step}}"></view></view>
+
+    <view wx:if="{{step === 0}}" class="stage welcome-stage">
+      <view class="moon-mark"><view class="moon-cut"></view></view>
+      <text class="eyebrow">把空闲，还给生活</text>
+      <view class="welcome-title">人生不必急着回答。</view>
+      <view class="welcome-title">先看看这一段空闲，</view>
+      <view class="welcome-title accent">想怎么度过。</view>
+      <view class="hero-subtitle">这里没有打卡、排名和失败提醒。只是多看见几种选择，然后由你决定。</view>
+    </view>
+
+    <view wx:elif="{{step === 1}}" class="stage">
+      <text class="eyebrow">你愿意把生活交给什么</text>
+      <view class="stage-title">选一些最近会想起的内容</view>
+      <view class="hero-subtitle">可以多选，娱乐、休息和学习拥有同样的位置。</view>
+      <view class="chips interest-list">
+        <view wx:for="{{interests}}" wx:key="*this" class="chip interest {{selectedMap[item] ? 'active' : ''}}" data-value="{{item}}" bindtap="toggleInterest">{{item}}</view>
+      </view>
+    </view>
+
+    <view wx:else class="stage">
+      <text class="eyebrow">近来惦记</text>
+      <view class="stage-title">有没有一件模糊想做的事？</view>
+      <view class="hero-subtitle">只记下来，不必现在变成目标。以后可以请风月帮你慢慢展开。</view>
+      <view class="glass-card wish-card">
+        <textarea class="wish-input" maxlength="100" placeholder="例如：想去别的城市住几天" placeholder-class="placeholder" value="{{wish}}" bindinput="onWishInput"></textarea>
+        <view class="wish-note">它会先留在“想做清单”里</view>
+      </view>
+    </view>
+
+    <button class="primary-btn next-btn" bindtap="next">{{step === 2 ? '开始看看生活' : '继续'}}</button>
+  </view>
+</view>

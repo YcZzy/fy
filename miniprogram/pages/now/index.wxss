@@ -1,0 +1,40 @@
+.hero-row { display: flex; justify-content: space-between; gap: 24rpx; }
+.settings { width: 74rpx; height: 62rpx; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 34rpx; background: rgba(255,255,255,.55); border-radius: 50%; }
+.active-card { margin-top: 28rpx; padding: 24rpx 26rpx; background: rgba(45,41,37,.92); color: #fffaf3; }
+.active-dot { display: inline-block; width: 12rpx; height: 12rpx; margin-right: 12rpx; border-radius: 50%; background: #d5b783; }
+.active-label { color: rgba(255,250,243,.68); font-size: 22rpx; }
+.active-main { margin-top: 12rpx; display: flex; justify-content: space-between; align-items: baseline; }
+.active-name { font-size: 29rpx; font-weight: 600; }
+.active-time { font-size: 36rpx; font-variant-numeric: tabular-nums; }
+.focus-scroll { width: calc(100vw - 30rpx); margin-right: -30rpx; }
+.focus-row { display: flex; gap: 20rpx; padding-right: 30rpx; }
+.focus-card { width: 490rpx; flex: 0 0 490rpx; padding: 26rpx; }
+.focus-top { display: flex; align-items: center; justify-content: space-between; }
+.focus-count { color: var(--muted); font-size: 22rpx; }
+.focus-name { margin-top: 24rpx; font-size: 33rpx; font-weight: 630; }
+.focus-meta { margin-top: 10rpx; color: var(--muted); font-size: 23rpx; }
+.small-action { width: 100%; margin-top: 25rpx; padding-top: 20rpx; text-align: left; color: var(--caramel-deep); background: transparent; border-top: 1rpx solid rgba(93,74,58,.08); font-size: 25rpx; }
+.field-label.first { margin-top: 0; }
+.context-input { box-sizing: border-box; width: 100%; min-height: 92rpx; margin-top: 26rpx; padding: 22rpx; border-radius: 20rpx; background: rgba(234,225,213,.42); line-height: 1.55; }
+.generate-btn { margin-top: 20rpx; width: 100%; }
+.breathing { animation: breathe 1.5s ease-in-out infinite; }
+.recommend-card { position: relative; display: flex; overflow: hidden; margin-bottom: 18rpx; }
+.recommend-accent { width: 8rpx; flex: 0 0 8rpx; opacity: .78; }
+.recommend-body { flex: 1; padding: 26rpx 26rpx 22rpx; }
+.recommend-head { display: flex; justify-content: space-between; align-items: center; }
+.recommend-time { color: var(--muted); font-size: 23rpx; }
+.recommend-name { margin-top: 18rpx; font-size: 32rpx; font-weight: 630; }
+.recommend-reason { margin-top: 12rpx; color: var(--muted); line-height: 1.6; font-size: 25rpx; }
+.plan-link, .recommend-prep, .location-note { margin-top: 12rpx; color: var(--olive); font-size: 22rpx; }
+.recommend-prep { color: #8a8279; }
+.location-note { color: var(--blue-grey); line-height: 1.5; }
+.recommend-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 22rpx; }
+.do-btn { margin: 0; padding: 16rpx 24rpx; color: #fffaf4; background: var(--ink); font-size: 24rpx; }
+.text-btn { margin: 0; color: var(--muted); background: transparent; font-size: 23rpx; }
+.ask-card { display: flex; align-items: center; margin-top: 42rpx; padding: 24rpx; }
+.ask-symbol { width: 76rpx; height: 76rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: var(--caramel); font-size: 27rpx; }
+.ask-copy { flex: 1; display: flex; flex-direction: column; margin-left: 20rpx; }
+.ask-title { font-size: 28rpx; font-weight: 620; }
+.ask-sub { margin-top: 6rpx; color: var(--muted); font-size: 22rpx; }
+.ask-arrow { color: var(--muted); font-size: 48rpx; font-weight: 300; }
+@keyframes breathe { 50% { box-shadow: 0 12rpx 44rpx rgba(213,183,131,.55); } }

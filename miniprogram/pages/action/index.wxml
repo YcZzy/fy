@@ -1,0 +1,32 @@
+<view class="page action-page"><view class="page-content" wx:if="{{action}}">
+  <view class="action-orbit"><view class="action-orbit-inner">{{action.domainInitial}}</view></view>
+  <text class="eyebrow">{{action.domainName}}</text>
+  <view class="action-title">{{action.name}}</view>
+  <view class="action-meta"><text>{{action.duration}}</text><text wx:if="{{action.planName}}"> · 来自「{{action.planName}}」</text></view>
+
+  <view class="glass-card action-detail">
+    <view class="detail-row"><text class="detail-label">为什么是它</text><text class="detail-value">{{action.reason || '现在开始，门槛刚刚好。'}}</text></view>
+    <view class="divider"></view>
+    <view class="detail-row"><text class="detail-label">需要准备</text><text class="detail-value">{{action.preparation}}</text></view>
+    <view wx:if="{{action.locationNote}}" class="location-note">{{action.locationNote}}</view>
+  </view>
+
+  <view wx:if="{{session}}" class="timer-panel glass-card">
+    <text class="timer-status">{{session.status === 'paused' ? '暂停在这里' : '正在经历'}}</text>
+    <text class="timer-value">{{elapsed}}</text>
+    <view class="timer-actions">
+      <button wx:if="{{session.status === 'running'}}" class="secondary-btn" bindtap="pause">暂停</button>
+      <button wx:else class="secondary-btn" bindtap="resume">继续</button>
+      <button class="primary-btn" bindtap="finish">结束并记录</button>
+    </view>
+    <button class="ghost-btn cancel" bindtap="cancel">不留下记录，结束计时</button>
+  </view>
+
+  <view wx:else class="start-panel">
+    <view class="start-note">选择之后也不会自动计时</view>
+    <button class="primary-btn" bindtap="startTimer">开始计时</button>
+    <button class="secondary-btn" bindtap="startWithReminder">设置结束提醒并计时</button>
+    <button class="secondary-btn" bindtap="direct">直接去做</button>
+    <button class="ghost-btn" bindtap="later">稍后再说</button>
+  </view>
+</view></view>

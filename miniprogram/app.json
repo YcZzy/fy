@@ -1,0 +1,39 @@
+{
+  "pages": [
+    "pages/now/index",
+    "pages/moon/index",
+    "pages/footprints/index",
+    "pages/onboarding/index",
+    "pages/action/index",
+    "pages/record/index",
+    "pages/chat/index",
+    "pages/plan/index",
+    "pages/settings/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#F4EFE7",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "风月为邻",
+    "backgroundColor": "#F4EFE7",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#8A8279",
+    "selectedColor": "#A96542",
+    "backgroundColor": "#FBF7F1",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/now/index", "text": "此刻" },
+      { "pagePath": "pages/moon/index", "text": "风月" },
+      { "pagePath": "pages/footprints/index", "text": "足迹" }
+    ]
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "仅在你主动确认当前地区或为足迹添加位置时使用"
+    }
+  },
+  "requiredPrivateInfos": ["chooseLocation"],
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

@@ -1,0 +1,15 @@
+<view class="page plan-page"><view class="page-content">
+  <text class="eyebrow">{{isNew ? '让想法有一个容器' : '计划详情'}}</text>
+  <view class="hero-title">{{isNew ? '不设完成率，只记录经历' : plan.name}}</view>
+  <view class="hero-subtitle">计划可以并行，也可以暂停。重要日期只是信息，不会变成催促。</view>
+
+  <view class="section glass-card card-pad form-card">
+    <view class="field-label first">计划名称</view><input class="input" maxlength="30" placeholder="例如：六周英语体验" value="{{plan.name}}" bindinput="onName"/>
+    <view class="field-label">为什么想做</view><textarea class="textarea" maxlength="180" placeholder="想通过这段体验回答什么？" value="{{plan.why}}" bindinput="onWhy"></textarea>
+    <view class="field-label">所属板块</view><picker mode="selector" range="{{domains}}" range-key="name" value="{{domainIndex}}" bindchange="onDomain"><view class="picker-value">{{domains[domainIndex].name}} <text>⌄</text></view></picker>
+    <view class="field-label">当前状态</view><view class="chips"><view wx:for="{{statuses}}" wx:key="value" class="chip {{plan.status === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="setStatus">{{item.label}}</view></view>
+    <view class="focus-toggle" bindtap="toggleFocus"><view><text class="toggle-title">标记为最近关注</text><text class="toggle-sub">首页最多展示三个最近关注计划</text></view><view class="switch {{plan.focused ? 'on' : ''}}"><view></view></view></view>
+    <view class="field-label">重要日期（选填）</view><picker mode="date" value="{{plan.importantDate}}" bindchange="onDate"><view class="picker-value muted-value">{{plan.importantDate || '选择日期'}} <text>⌄</text></view></picker>
+  </view>
+  <button class="primary-btn save-plan" bindtap="save">保存计划</button>
+</view></view>

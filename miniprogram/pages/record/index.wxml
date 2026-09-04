@@ -1,0 +1,37 @@
+<view class="page record-page"><view class="page-content" wx:if="{{action}}">
+  <text class="eyebrow">刚刚的生活</text>
+  <view class="hero-title">{{action.name}}</view>
+  <view class="hero-subtitle">记多少都可以，也可以轻轻跳过。</view>
+
+  <view class="section glass-card card-pad">
+    <view class="section-title small">大约多久</view>
+    <view class="chips duration-chips">
+      <view wx:for="{{durations}}" wx:key="label" class="chip {{minutes === item.value ? 'active' : ''}}" data-value="{{item.value === null ? 'none' : item.value}}" bindtap="selectDuration">{{item.label}}</view>
+    </view>
+    <view class="custom-duration"><input type="number" maxlength="3" value="{{customMinutes}}" bindinput="onCustomMinutes" placeholder="手动填写"/><text>分钟</text></view>
+  </view>
+
+  <view class="section">
+    <view class="section-title small">此刻的感受</view>
+    <view class="feeling-grid">
+      <view wx:for="{{feelings}}" wx:key="value" class="feeling {{feeling === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectFeeling">
+        <text class="feeling-symbol">{{item.symbol}}</text><text>{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section glass-card card-pad">
+    <textarea class="note-input" maxlength="240" placeholder="留一句话给以后的自己（选填）" placeholder-class="placeholder" value="{{note}}" bindinput="onNote"></textarea>
+    <view class="again-row"><text>以后还想再做吗？</text><view class="again-actions"><text class="again {{again === 'yes' ? 'active' : ''}}" data-value="yes" bindtap="selectAgain">想</text><text class="again {{again === 'no' ? 'active' : ''}}" data-value="no" bindtap="selectAgain">暂时不了</text></view></view>
+  </view>
+
+  <view class="attachment-row">
+    <view class="attachment" bindtap="choosePhoto"><text class="attachment-icon">▧</text><text>{{photoPath ? '换张照片' : '加张照片'}}</text></view>
+    <view class="attachment" bindtap="chooseLocation"><text class="attachment-icon">⌖</text><text>{{location ? location.name : '留下位置'}}</text></view>
+  </view>
+  <view wx:if="{{photoPath}}" class="preview-wrap"><image class="photo-preview" mode="aspectFill" src="{{photoPath}}"></image><text class="remove" bindtap="removePhoto">移除</text></view>
+  <view wx:if="{{location}}" class="location-preview"><text>{{location.name}}</text><text class="remove" bindtap="removeLocation">移除</text></view>
+
+  <button class="primary-btn save-btn" loading="{{saving}}" bindtap="save">留下这次足迹</button>
+  <button class="ghost-btn skip-btn" bindtap="skip">跳过细节，直接记一笔</button>
+</view></view>

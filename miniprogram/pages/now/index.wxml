@@ -1,0 +1,69 @@
+<view class="page now-page"><view class="page-content">
+  <view class="hero-row">
+    <view>
+      <text class="eyebrow">此刻 · {{recommendationSource === 'ai' ? '风有回音' : '风月为邻'}}</text>
+      <view class="hero-title">{{greeting}}</view>
+      <view class="hero-subtitle">这一段空闲，想交给什么？</view>
+    </view>
+    <view class="settings" bindtap="openSettings">···</view>
+  </view>
+
+  <view wx:if="{{activeSession}}" class="active-card glass-card" bindtap="openActive">
+    <view><text class="active-dot"></text><text class="active-label">正在{{activeSession.status === 'paused' ? '暂停' : '计时'}}</text></view>
+    <view class="active-main"><text class="active-name">{{activeSession.actionName}}</text><text class="active-time">{{activeElapsed}}</text></view>
+  </view>
+
+  <view class="section" wx:if="{{focusedPlans.length}}">
+    <view class="section-head"><text class="section-title">近来惦记</text><text class="section-note">最多三件，不必都做</text></view>
+    <scroll-view scroll-x class="focus-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="focus-row">
+        <view wx:for="{{focusedPlans}}" wx:key="id" class="focus-card glass-card">
+          <view class="focus-top"><text class="tag">最近关注</text><text class="focus-count">{{item.count}} 次</text></view>
+          <view class="focus-name">{{item.name}}</view>
+          <view class="focus-meta">{{item.duration}} · {{item.lastFeeling}}</view>
+          <button class="small-action" data-id="{{item.id}}" bindtap="continuePlan">继续一下 <text>→</text></button>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="section">
+    <view class="section-head"><text class="section-title">现在的状态</text><text class="section-note">只选此刻，不替未来决定</text></view>
+    <view class="state-card glass-card card-pad">
+      <view class="field-label first">有多少时间</view>
+      <view class="chips"><view wx:for="{{timeOptions}}" wx:key="value" class="chip {{context.minutes === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectTime">{{item.label}}</view></view>
+      <view class="field-label">现在的力气</view>
+      <view class="chips"><view wx:for="{{energyOptions}}" wx:key="value" class="chip {{context.energy === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectEnergy">{{item.label}}</view></view>
+      <view class="field-label">在哪里</view>
+      <view class="chips"><view wx:for="{{envOptions}}" wx:key="value" class="chip {{context.environment === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectEnvironment">{{item.label}}</view></view>
+      <textarea class="context-input" auto-height maxlength="120" placeholder="还可以说一句：今晚只想休息，或最不想做什么…" placeholder-class="placeholder" value="{{context.note}}" bindinput="onNoteInput"></textarea>
+    </view>
+    <button class="primary-btn generate-btn {{generating ? 'breathing' : ''}}" loading="{{generating}}" bindtap="generate">{{generating ? '正在听风…' : '看看此刻能做什么'}}</button>
+  </view>
+
+  <view wx:if="{{recommendations.length}}" class="section results">
+    <view class="section-head"><text class="section-title">此刻可做</text><button class="ghost-btn" bindtap="swapGroup">换一组</button></view>
+    <view wx:for="{{recommendations}}" wx:key="id" class="recommend-card solid-card">
+      <view class="recommend-accent" style="background: {{item.domainColor}}"></view>
+      <view class="recommend-body">
+        <view class="recommend-head"><text class="tag">{{item.domainName}}</text><text class="recommend-time">{{item.minutes}} 分钟</text></view>
+        <view class="recommend-name">{{item.name}}</view>
+        <view class="recommend-reason">{{item.reason}}</view>
+        <view wx:if="{{item.planName}}" class="plan-link">来自「{{item.planName}}」</view>
+        <view class="recommend-prep">准备：{{item.preparation}}</view>
+        <view wx:if="{{item.locationNote}}" class="location-note">{{item.locationNote}}</view>
+        <view class="recommend-actions">
+          <button class="do-btn" data-id="{{item.id}}" bindtap="chooseAction">就做这个</button>
+          <button class="text-btn" data-id="{{item.id}}" bindtap="similarAction">换个类似的</button>
+          <button class="text-btn" data-id="{{item.id}}" bindtap="declineAction">暂时不想做</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="ask-card glass-card" bindtap="openChat">
+    <view class="ask-symbol">风</view>
+    <view class="ask-copy"><text class="ask-title">问风月</text><text class="ask-sub">展开想法、建个计划，或只是聊聊</text></view>
+    <text class="ask-arrow">›</text>
+  </view>
+</view></view>

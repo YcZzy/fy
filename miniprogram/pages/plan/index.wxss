@@ -1,0 +1,12 @@
+.field-label.first { margin-top: 0; }
+.picker-value { display: flex; justify-content: space-between; padding: 22rpx 24rpx; border-radius: 22rpx; background: rgba(255,255,255,.62); border: 1rpx solid rgba(93,74,58,.1); }
+.muted-value { color: var(--muted); }
+.focus-toggle { display: flex; align-items: center; justify-content: space-between; margin-top: 30rpx; padding-top: 28rpx; border-top: 1rpx solid rgba(93,74,58,.08); }
+.focus-toggle>view:first-child { display: flex; flex-direction: column; gap: 7rpx; }
+.toggle-title { font-weight: 600; }
+.toggle-sub { color: var(--muted); font-size: 21rpx; }
+.switch { width: 86rpx; height: 48rpx; padding: 5rpx; box-sizing: border-box; border-radius: 999rpx; background: #d5cdc4; transition: background .2s; }
+.switch view { width: 38rpx; height: 38rpx; border-radius: 50%; background: #fff; box-shadow: 0 2rpx 8rpx rgba(0,0,0,.12); transition: transform .2s; }
+.switch.on { background: var(--olive); }
+.switch.on view { transform: translateX(38rpx); }
+.save-plan { margin-top: 26rpx; }
