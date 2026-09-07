@@ -1,8 +1,10 @@
 <view class="page record-page context-page theme-{{theme}}"><view class="page-content" wx:if="{{action}}">
-  <text class="eyebrow">刚刚的生活</text>
-  <view class="hero-title">{{action.name}}</view>
-  <view class="hero-subtitle">记多少都可以，也可以轻轻跳过。</view>
+  <text class="eyebrow">{{isEdit ? "修改足迹" : manual ? "补记生活" : "刚刚的生活"}}</text>
+  <view class="hero-title">{{action.name || "补记一段生活"}}</view>
+  <view class="hero-subtitle">{{isEdit ? "修改只影响这条足迹。" : "状态和感受就够了，其他内容按需补充。"}}</view>
 
+  <view wx:if="{{manual}}" class="section glass-card card-pad"><view class="field-label">做了什么</view><input class="input" maxlength="60" value="{{action.name}}" placeholder="例如：和朋友散了一会儿步" bindinput="onName"/><view class="field-label">生活板块</view><picker range="{{domains}}" range-key="name" value="{{domainIndex}}" bindchange="onDomain"><view class="record-date">{{domains[domainIndex].name}} ▾</view></picker></view>
+  <picker mode="date" end="{{today}}" value="{{recordDate}}" bindchange="onDate"><view class="record-date">发生日期：{{recordDate}} ▾</view></picker>
   <view class="section">
     <view class="section-title small">后来怎么样</view>
     <view class="chips completion-chips"><view wx:for="{{completions}}" wx:key="value" class="chip {{completion === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectCompletion">{{item.label}}</view></view>
@@ -25,6 +27,8 @@
     </view>
   </view>
 
+  <button class="ghost-btn details-toggle" bindtap="toggleDetails">{{expanded ? '收起补充内容' : '补充文字、照片或位置（选填）'}} ▾</button>
+  <view wx:if="{{expanded}}">
   <view class="section glass-card card-pad">
     <textarea class="note-input" maxlength="240" placeholder="留一句话给以后的自己（选填）" placeholder-class="placeholder" value="{{note}}" bindinput="onNote"></textarea>
     <view class="again-row"><text>以后还想再做吗？</text><view class="again-actions"><text class="again {{again === 'yes' ? 'active' : ''}}" data-value="yes" bindtap="selectAgain">想</text><text class="again {{again === 'no' ? 'active' : ''}}" data-value="no" bindtap="selectAgain">暂时不了</text></view></view>
@@ -37,6 +41,7 @@
   <view wx:if="{{photoPath}}" class="preview-wrap"><image class="photo-preview" mode="aspectFill" src="{{photoPath}}"></image><text class="remove" bindtap="removePhoto">移除</text></view>
   <view wx:if="{{location}}" class="location-preview"><text>{{location.name}}</text><text class="remove" bindtap="removeLocation">移除</text></view>
 
-  <button class="primary-btn save-btn" loading="{{saving}}" bindtap="save">留下这次足迹</button>
-  <button class="ghost-btn skip-btn" bindtap="skip">跳过细节，直接记一笔</button>
+  </view>
+  <button class="primary-btn save-btn" loading="{{saving}}" disabled="{{saving}}" bindtap="save">{{isEdit ? "保存修改" : "留下这次足迹"}}</button>
+  <button class="ghost-btn skip-btn" bindtap="skip">{{isEdit || manual ? "取消，返回" : "不留下记录，结束这件事"}}</button>
 </view></view>

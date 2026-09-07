@@ -42,12 +42,12 @@ function createInitialState() {
       selectedInterests: [],
       lastContext: { minutes: 30, energy: 'medium', environment: 'any', note: '', locationSummary: '' },
       reminders: {},
-      updatedAt: now
+      updatedAt: 0
     },
-    domains: DOMAINS,
-    actions: ACTIONS,
-    plans: PLANS,
-    wishes: [{ id: 'w_city', text: '想去别的城市住几天', createdAt: now }],
+    domains: DOMAINS.map((item) => ({ ...item })),
+    actions: ACTIONS.map((item) => ({ ...item, energy: [...item.energy], environments: [...item.environments] })),
+    plans: [],
+    wishes: [],
     footprints: [],
     reviews: [],
     conversations: [],
@@ -57,7 +57,11 @@ function createInitialState() {
     declinedActions: [],
     pendingFileDeletes: [],
     syncQueue: [],
-    syncTombstones: {}
+    syncTombstones: {},
+    cloudEpoch: 0,
+    dataToken: `${now}_${Math.random().toString(36).slice(2)}`,
+    deletionPending: false,
+    lastSyncedAt: 0
   }
 }
 

@@ -1,11 +1,11 @@
-<view class="onboarding page">
+<view class="onboarding page" style="padding-top: {{topInset}}px">
   <view class="page-content onboarding-inner">
     <view class="topline">
       <text class="brand">风月为邻</text>
-      <button class="ghost-btn" bindtap="skip">跳过</button>
+      <button class="ghost-btn" bindtap="skip">{{editing ? "取消" : "跳过"}}</button>
     </view>
 
-    <view class="progress"><view class="progress-fill step-{{step}}"></view></view>
+    <view wx:if="{{!editing}}" class="progress"><view class="progress-fill step-{{step}}"></view></view>
 
     <view wx:if="{{step === 0}}" class="stage welcome-stage">
       <view class="moon-mark"><view class="moon-cut"></view></view>
@@ -46,6 +46,7 @@
       <button class="secondary-btn add-initial" bindtap="addAction">＋ 补充一个行动</button>
     </view>
 
-    <button class="primary-btn next-btn" bindtap="next">{{step === 3 ? '开始看看生活' : '继续'}}</button>
+    <button wx:if="{{step > 0 && !editing}}" class="ghost-btn" bindtap="back">上一步</button>
+    <button class="primary-btn next-btn" bindtap="next">{{editing ? '保存兴趣' : step === 3 ? '开始看看生活' : '继续'}}</button>
   </view>
 </view>

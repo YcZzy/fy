@@ -16,12 +16,13 @@ function extractJson(text) {
 async function generate(messages) {
   if (!isReady()) throw new Error('AI_NOT_CONFIGURED')
   const model = wx.cloud.extend.AI.createModel(env.AI_PROVIDER)
-  const result = await model.generateText({ model: env.AI_MODEL, messages })
+  let timeout
+  const result = await Promise.race([
+    model.generateText({ model: env.AI_MODEL, messages }),
+    new Promise((resolve, reject) => { timeout = setTimeout(() => reject(new Error('AI_TIMEOUT')), 25000) })
+  ]).finally(() => clearTimeout(timeout))
   const text = result && result.choices && result.choices[0] && result.choices[0].message && result.choices[0].message.content
   if (!text) throw new Error('AI_EMPTY_RESPONSE')
-  if (env.ENABLE_CLOUD_SYNC && result.usage) {
-    wx.cloud.database().collection('ai_usage').add({ data: { model: env.AI_MODEL, usage: result.usage, ok: true, createdAt: Date.now() } }).catch((error) => console.warn('AI 用量记录失败', error))
-  }
   return { text, usage: result.usage || {} }
 }
 
@@ -29,17 +30,17 @@ async function recommend(state, context) {
   const compact = {
     context,
     domains: state.domains.filter((item) => !item.hidden).map(({ id, name }) => ({ id, name })),
-    actions: state.actions.filter((item) => !item.hidden).map(({ id, name, domainId, minutes, energy, environments, preparation }) => ({ id, name, domainId, minutes, energy, environments, preparation, planIds: state.plans.filter((plan) => (plan.actionIds || []).includes(id)).map((plan) => plan.id) })),
-    focusedPlans: state.plans.filter((item) => item.focused && item.status !== 'ended').map(({ id, name, domainId, actionIds }) => ({ id, name, domainId, actionIds: actionIds || [] })),
+    actions: state.actions.filter((item) => recommender.isEligible(item, state, context)).slice(0, 80).map(({ id, name, domainId, minutes, energy, environments, preparation }) => ({ id, name, domainId, minutes, energy, environments, preparation, planIds: state.plans.filter((plan) => (plan.actionIds || []).includes(id)).map((plan) => plan.id) })),
+    focusedPlans: state.plans.filter((item) => item.focused && !['ended', 'paused'].includes(item.status)).map(({ id, name, domainId, actionIds }) => ({ id, name, domainId, actionIds: actionIds || [] })),
     recent: state.footprints.slice(0, 8).map(({ actionId, actionName, minutes, feeling }) => ({ actionId, actionName, minutes, feeling })),
     selectedInterests: state.preferences.selectedInterests || [],
     declinedActionIds: (state.declinedActions || []).filter((item) => item.declinedAt >= Date.now() - 2 * 60 * 60 * 1000).map((item) => item.actionId).slice(-12)
   }
-  const system = '你是“风月为邻”的生活选择助手。语气温和、克制、略有诗意，但行动必须具体。娱乐与学习同等重要。不要评价、自律说教或虚构地点与用户经历。只返回 JSON：{"items":[{"name":"","domainId":"","minutes":30,"reason":"","planId":"","preparation":"","locationNote":""}]}。必须恰好 5 项，时长不得超过用户可用时间；未接入实时地点数据，只能推荐地点类别。'
+  const system = '你是“风月为邻”的生活选择助手。语气温和、克制、略有诗意，但行动必须具体。娱乐与学习同等重要。不要评价、自律说教或虚构地点与用户经历。只返回 JSON：{"items":[{"name":"","domainId":"","minutes":30,"reason":"","planId":"","preparation":"","locationNote":""}]}。返回 1 至 5 项高匹配建议，复用已有行动时必须返回其 actionId，时长不得超过用户可用时间；未接入实时地点数据，只能推荐地点类别。'
   const result = await generate([{ role: 'system', content: system }, { role: 'user', content: JSON.stringify(compact) }])
   const parsed = extractJson(result.text)
   const items = recommender.normalizeAiRecommendations(parsed.items, state, context)
-  if (items.length !== 5) throw new Error('AI_RECOMMENDATION_INVALID')
+  if (!items.length) throw new Error('AI_RECOMMENDATION_INVALID')
   return { items, usage: result.usage }
 }
 
@@ -47,14 +48,27 @@ async function chat(messages, contextSummary) {
   const system = '你是“问风月”。温和、克制、略有诗意，但回答清楚具体，不说教、不诊断。娱乐和休息也是正常生活。若用户要求创建行动或计划，只提出草稿，绝不声称已保存。只返回 JSON：{"reply":"给用户的话","draft":null}；若有草稿，draft 为 {"type":"action或plan","name":"","domainId":"rest|health|learn|career|travel|connect|create|daily","minutes":30,"why":"","planId":"可选且必须来自摘要中的真实计划ID","preparation":""}。'
   const safeMessages = messages.slice(-12).map(({ role, content }) => ({ role, content }))
   const result = await generate([{ role: 'system', content: `${system}\n可用的非敏感摘要：${JSON.stringify(contextSummary)}` }, ...safeMessages])
-  return { ...extractJson(result.text), usage: result.usage }
+  const parsed = extractJson(result.text)
+  if (typeof parsed.reply !== 'string' || !parsed.reply.trim()) throw new Error('AI_REPLY_INVALID')
+  const draft = normalizeDraft(parsed.draft, contextSummary)
+  return { reply: parsed.reply.trim().slice(0, 6000), draft, usage: result.usage }
 }
 
 async function review(footprints, rangeLabel) {
-  const data = footprints.map(({ actionName, domainName, minutes, feeling, note, createdAt }) => ({ actionName, domainName, minutes, feeling, note, createdAt }))
-  const system = '你为“风月为邻”生成生活回顾。只描述发生过的事情、感受与温和可能性，不打分、不制造负罪感、不制定目标。周回顾 150-300 字。只返回 JSON：{"content":""}。'
+  if (footprints.length > 300) throw new Error('AI_REVIEW_TOO_LARGE')
+  const data = footprints.map(({ actionName, domainName, minutes, feeling, note, createdAt, completionStatus }) => ({ actionName, domainName, minutes, feeling, note, createdAt, completionStatus }))
+  const system = '你为“风月为邻”生成生活回顾。区分 completionStatus：not_started 是没有去做，不得描述为实际经历；minutes 为空表示未知而非零。只描述发生过的事情、感受与温和可能性，不打分、不制造负罪感、不制定目标。周回顾 150-300 字。只返回 JSON：{"content":""}。'
   const result = await generate([{ role: 'system', content: system }, { role: 'user', content: JSON.stringify({ rangeLabel, footprints: data }) }])
-  return { ...extractJson(result.text), usage: result.usage }
+  const parsed = extractJson(result.text)
+  if (typeof parsed.content !== 'string' || !parsed.content.trim()) throw new Error('AI_REVIEW_INVALID')
+  return { content: parsed.content.trim().slice(0, 6000), usage: result.usage }
 }
 
-module.exports = { isReady, recommend, chat, review }
+function normalizeDraft(raw, summary = {}) {
+  if (!raw || !['action', 'plan'].includes(raw.type) || typeof raw.name !== 'string' || !raw.name.trim()) return null
+  const domains = summary.domains || []
+  const domainId = domains.some((item) => item.id === raw.domainId) ? raw.domainId : 'daily'
+  const plan = (summary.plans || []).find((item) => item.id === raw.planId && item.domainId === domainId)
+  return { type: raw.type, name: raw.name.trim().slice(0, 30), domainId, minutes: Math.min(720, Math.max(1, Math.round(Number(raw.minutes) || 30))), why: String(raw.why || '').slice(0, 180), preparation: String(raw.preparation || '不需要额外准备').slice(0, 60), planId: plan ? plan.id : '', source: 'ai' }
+}
+module.exports = { isReady, recommend, chat, review, normalizeDraft }

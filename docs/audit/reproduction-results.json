@@ -1,0 +1,147 @@
+{
+  "scope": "Node isolated mocks; no live cloud or native renderer",
+  "results": [
+    {
+      "id": "R01",
+      "title": "Local-mode onShow throws on all three tabs",
+      "reproduced": true,
+      "evidence": {
+        "now": "Cannot read properties of undefined (reading 'then')",
+        "moon": "Cannot read properties of undefined (reading 'then')",
+        "footprints": "Cannot read properties of undefined (reading 'then')"
+      }
+    },
+    {
+      "id": "R02",
+      "title": "Editing an old footprint clears an unrelated timer",
+      "reproduced": true,
+      "evidence": {
+        "activeSessionAfterEdit": null
+      }
+    },
+    {
+      "id": "R03",
+      "title": "Pausing does not extend reminder deadline",
+      "reproduced": true,
+      "evidence": {
+        "actualActiveMinutes": 2,
+        "reminderAlreadyDue": true
+      }
+    },
+    {
+      "id": "R04",
+      "title": "Second direct action silently replaces the first",
+      "reproduced": true,
+      "evidence": {
+        "pendingActionId": "b"
+      }
+    },
+    {
+      "id": "R05",
+      "title": "Dismissing the direct-action prompt consumes the only prompt",
+      "reproduced": true,
+      "evidence": {
+        "willPromptAgain": false,
+        "pendingEntryInTemplate": false
+      }
+    },
+    {
+      "id": "R06",
+      "title": "Not-started records become most frequent actions; unknown time becomes zero",
+      "reproduced": true,
+      "evidence": {
+        "count": 1,
+        "totalDuration": "0 分钟",
+        "domains": [
+          {
+            "name": "Rest",
+            "count": 1,
+            "minutes": 0,
+            "duration": "0 分钟"
+          }
+        ],
+        "feelings": {
+          "love": 0,
+          "good": 0,
+          "okay": 0,
+          "poor": 0
+        },
+        "favorite": "Never performed"
+      }
+    },
+    {
+      "id": "R07",
+      "title": "Recommendation response uses stale context after selections change",
+      "reproduced": true,
+      "evidence": {
+        "selectedMinutes": 10,
+        "displayedMinutes": 30
+      }
+    },
+    {
+      "id": "R08",
+      "title": "AI recommendation receives a new ID on each generation",
+      "reproduced": true,
+      "evidence": {
+        "sameNameActionCount": 3,
+        "distinctIds": true
+      }
+    },
+    {
+      "id": "R09",
+      "title": "Existing action detail discards recommendation reason",
+      "reproduced": true,
+      "evidence": {
+        "reasonInCache": "Specific context reason",
+        "reasonInDetail": null
+      }
+    },
+    {
+      "id": "R10",
+      "title": "Changing review period during request mislabels saved content",
+      "reproduced": true,
+      "evidence": {
+        "requestedLabel": "本周",
+        "savedPeriod": "month"
+      }
+    },
+    {
+      "id": "R11",
+      "title": "Clear conversation during generation is undone by the response",
+      "reproduced": true,
+      "evidence": {
+        "messagesAfterClearAndResponse": 2
+      }
+    },
+    {
+      "id": "R12",
+      "title": "Direct AI draft save loses preparation and source",
+      "reproduced": true,
+      "evidence": {
+        "preparation": "不需要额外准备",
+        "source": "user"
+      }
+    },
+    {
+      "id": "R13",
+      "title": "New-device default preferences supersede older cloud preferences",
+      "reproduced": true,
+      "evidence": {
+        "cloudInterests": [
+          "阅读"
+        ],
+        "restoredInterests": [],
+        "restoredOnboarding": false
+      }
+    },
+    {
+      "id": "R14",
+      "title": "Pending sync restores private data after delete-all",
+      "reproduced": true,
+      "evidence": {
+        "deletedWishReuploaded": true,
+        "deletedWishRestoredLocally": true
+      }
+    }
+  ]
+}

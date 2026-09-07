@@ -34,3 +34,15 @@
 .send-btn { width: 74rpx; height: 74rpx; line-height: 74rpx; flex: 0 0 74rpx; color: #fff; background: var(--caramel); font-size: 34rpx; }
 .send-btn[disabled] { opacity: .38; }
 @keyframes dot { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-5rpx); } }
+
+.bubble { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.chat-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+.chat-tools .ghost-btn { padding: 0 12rpx; min-height: 76rpx; font-size: 24rpx; }
+.chat-head { gap: 12rpx; }
+.chat-head .eyebrow { letter-spacing: 1rpx; font-size: 20rpx; }
+.chat-welcome { padding-top: 36rpx; }
+.history-list { margin-top: 18rpx; padding-bottom: 20rpx; }
+.history-name { min-width: 0; }
+.history-name .muted { margin-top: 8rpx; font-size: 21rpx; }
+.retry-row, .saved-target { margin-top: 24rpx; }
+.retry-row button { font-size: 24rpx; padding: 0 14rpx; }

@@ -16,3 +16,11 @@
 .timer-actions { display: flex; gap: 16rpx; }
 .timer-actions button { flex: 1; }
 .cancel { margin-top: 18rpx; color: var(--muted); }
+
+.action-page { padding-top: 36rpx; }
+.action-orbit { width: 106rpx; height: 106rpx; margin-bottom: 22rpx; padding: 9rpx; }
+.action-title { font-size: 42rpx; }
+.action-detail { margin-top: 28rpx; }
+.start-panel { margin-top: 28rpx; }
+.start-note { line-height: 1.6; }
+.plan-choice { padding: 22rpx; margin-top: 24rpx; color: var(--theme-deep); background: var(--theme-surface); border-radius: 20rpx; }

@@ -2,5 +2,8 @@
   "name": "feng-yue-wei-lin",
   "version": "1.0.0",
   "private": true,
-  "scripts": { "check": "node scripts/validate.js && node scripts/test-repository.js && node scripts/test-recommender.js && node scripts/test-sync.js && node scripts/test-cloud-delete.js" }
+  "scripts": {
+    "check": "node scripts/validate.js && node scripts/test-repository.js && node scripts/test-recommender.js && node scripts/test-sync.js && node scripts/test-cloud-delete.js && node scripts/test-data-manager.js && node scripts/test-flows.js",
+    "check:native": "node scripts/check-native.js"
+  }
 }

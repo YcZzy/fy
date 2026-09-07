@@ -57,3 +57,19 @@
 .ask-sub { margin-top: 6rpx; color: var(--muted); font-size: 22rpx; }
 .ask-arrow { color: var(--muted); font-size: 48rpx; font-weight: 300; }
 @keyframes breathe { 50% { box-shadow: 0 12rpx 44rpx rgba(196,125,96,.34); } }
+
+.hero-row>view:first-child { flex: 1; min-width: 0; }
+.settings { flex: 0 0 76rpx; width: 76rpx; height: 76rpx; }
+.hero-title { font-size: 44rpx; }
+.active-name { min-width: 0; flex: 1; overflow-wrap: break-word; }
+.active-time { flex-shrink: 0; margin-left: 18rpx; }
+.pending-card { margin-top: 26rpx; }
+.pending-name { font-size: 30rpx; font-weight: 600; margin: 18rpx 0 22rpx; }
+.location-summary { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; margin-top: 18rpx; color: var(--muted); font-size: 24rpx; }
+.location-summary text { flex: 1; min-width: 0; }
+.location-summary button { flex-shrink: 0; }
+.text-btn { min-height: 76rpx; padding: 8rpx; display: flex; align-items: center; text-align: center; box-sizing: border-box; }
+.recommend-actions { gap: 8rpx; flex-wrap: wrap; }
+.recommend-body { min-width: 0; }
+.empty { margin-top: 28rpx; }
+.empty button { margin-top: 24rpx; }

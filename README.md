@@ -2,64 +2,58 @@
 
 > 把空闲，还给生活。
 
-基于《风月为邻微信小程序需求文档 PRD v1.0》开发的微信原生小程序。项目默认可在无 AppID、无云环境时以本地模式运行；配置 CloudBase 后启用 `hy3`、云数据库、私有照片存储和个人数据云端删除。
+微信原生小程序：根据空闲时间和当前状态选择行动，通过计划整理想法，用足迹记录经历。仓库暂未包含原始 PRD；现有页面和代码是本次检查的需求依据。
 
 ## 已实现
 
-- 一分钟首次引导、默认生活板块和行动库；
-- “此刻 / 风月 / 足迹”三个主页面与暖色玻璃拟态设计系统；
-- 时间、精力、环境、用户确认的位置摘要和自由描述；
-- 每次五个候选，`hy3` 失败时自动使用本地规则推荐；
-- 多计划、最近关注、想做清单，以及可搜索、编辑、关联计划并直接开始的行动库；
-- 计时、暂停、恢复、直接去做和再次打开后的单次追问；
-- 足迹完成状态、时长、感受、文字、照片、位置、编辑与删除；
-- 周、月、年和自定义回望，AI 失败时生成无评价的基础回顾；
-- “问风月”对话历史，AI 行动/计划草稿必须点击确认后才保存；
-- 本地优先存储、持久化待同步队列、本地/云端按记录合并、跨设备删除标记、私有照片和全部个人数据删除。
+- 首次引导、可重新调整的兴趣、默认生活板块与行动库；新用户的个人计划和愿望为空。
+- “此刻 / 风月 / 足迹”三个主页面，沿用暖色玻璃样式。
+- 按时间、精力、环境、确认过的地区摘要和文字描述推荐，最多五个候选；AI 不可用时回退本地规则。
+- 计划、想做清单、可搜索编辑的行动库；新计划可在同一流程中关联或创建行动。
+- 计时、暂停、恢复、直接去做；首页持续保留待记录入口。提醒仅在行动页或返回首页时出现。
+- 足迹补记、历史日期、完成状态、可选时长和感受、照片与位置、编辑与删除；按关键字、日期和计划筛选。
+- 周、月、年和自定义日期回顾，保存明确的日期范围。未做单独统计，未知时长不当作零分钟。
+- AI 对话历史、重试、消息删除、草稿恢复；草稿由用户确认后保存为计划或行动。
+- 本地存储、持久化同步队列、照片补传、设置页同步状态与重试、跨设备删除版本控制。
 
-## 直接运行
+## 本地运行
 
-1. 用微信开发者工具导入本目录。
-2. 未配置 AppID 时保留 `project.config.json` 中的 `touristappid`，先体验本地流程。
-3. 真机和云能力接入时，将 `project.config.json` 的 `appid` 换成实际 AppID。
+1. 用微信开发者工具导入本目录，源代码目录为 `miniprogram/`。
+2. 当前 `project.config.json` 已配置 AppID，`miniprogram/config/env.js` 已配置云环境且开启同步；这不代表云函数与权限已经部署。
+3. 只体验本地流程时，将 `CLOUD_ENV_ID` 改为空字符串。若没有该 AppID 的开发权限，可在本机导入配置中选择测试号或游客模式；可用能力以开发者工具提示为准。
+4. 真机与云能力需要有权限的 AppID、关联的 CloudBase 环境，以及下面的部署配置。
 
-## CloudBase 配置
+## CloudBase 配置与协议升级
 
-1. 在 `miniprogram/config/env.js` 填入 `CLOUD_ENV_ID`。
-2. 在控制台的 AI → 生文模型中开启 `hy3`。小程序基础库要求 3.15.1 或更高。
-3. 根据 `cloudbase/collections.json` 创建所需集合，并部署 `dataManager`（仅用于完整个人数据删除等管理操作）。
-4. 创建集合不会自动应用权限文件；发布前必须通过部署流程或控制台，将 `cloudbase/database-rule.json` 应用到每个集合，并将 `cloudbase/storage-rule.json` 应用到云存储。
-5. 当前项目已开启 `ENABLE_CLOUD_SYNC`；部署 `dataManager` 云函数后可执行完整个人数据删除。
+本次同步协议为 **2**。`dataManager` 同时承担读取、写入与删除管理，客户端不再直接写业务集合。以下修改已保存在仓库，**本次未执行远程部署**。
 
-没有环境 ID 时不执行集合创建或云函数部署。拿到环境 ID 后，可先运行：
+1. 确认 `miniprogram/config/env.js` 的环境 ID 与目标小程序关联。AI 使用配置中的 `hy3`；原项目配置要求基础库 3.15.1 或更高，模型是否可用需在目标环境验证。
+2. 根据 `cloudbase/collections.json` 创建集合，包含新增的 `sync_control`。云函数的 `initialize` 入口也能创建集合，但不能代替权限配置。
+3. 在微信开发者工具中上传部署 `cloudfunctions/dataManager`，选择云端安装依赖。
+4. 对 `user_preferences`、`life_domains`、`actions`、`plans`、`wishes`、`footprints`、`reviews`、`ai_conversations`、`ai_usage` 应用 `cloudbase/database-rule.json`：仅本人读取，客户端禁止直接写入。
+5. **只对 `sync_control` 应用 `cloudbase/control-rule.json`**：客户端禁止读写。云函数以服务端权限维护此集合。
+6. 对云存储应用 `cloudbase/storage-rule.json`，限定文件拥有者访问。照片删除使用调用者的客户端权限；服务端不拿用户提供的文件 ID 执行管理员删除。
+7. 验证协议、权限和删除流程后再发布配套客户端。旧客户端仍会直接写集合，升级规则后这些写入将失败；需安排配套发布。旧写权限未关闭时，不能认为跨设备删除防恢复已生效。
 
-```bash
-/Users/cbim/.codex/skills/wechat-cloudbase-deploy/scripts/deploy-cloudbase.sh \
-  --dry-run \
-  --project /Users/cbim/game/fy \
-  --env cloud1-d6ggbwshu81f83485 \
-  --collections user_preferences,life_domains,actions,plans,wishes,footprints,reviews,ai_conversations,ai_usage \
-  dataManager
-```
+云函数从 `cloud.getWXContext()` 读取身份，覆盖客户端提交的 `_openid`，并校验集合和数据版本。每次写入与删除开始都在事务中访问同一用户控制记录，使已开始删除的版本拒绝旧请求写入。删除成功后保留最小重置标记，不保留生活内容。现存旧数据按 `localId` / `id` 合并，已有自动生成的云文档 ID 可继续使用。
 
-再根据 dry-run 结果初始化集合并部署云函数。云函数始终从 `cloud.getWXContext()` 读取调用者身份，不接受客户端伪造的 openid。
+如果后台仍是旧协议，新客户端保留本地待同步内容并显示同步未完成。删除异常时保留进度并暂停同步，设置页提供“继续删除”；部署修复或网络恢复后可重试。不要通过手动清空本地缓存来跳过未完成的云端删除。
 
-## 检查
+## 检查与验收
 
 ```bash
 npm run check
+npm run check:native
 ```
 
-静态检查验证页面文件、JSON 与 JavaScript 语法。真机位置授权、私有照片读取、`hy3` 生成质量及云同步仍需在配置实际 AppID 和环境 ID 后验证。
+`check` 包含页面文件、JSON、JavaScript 语法和事件绑定检查，以及仓储、推荐、同步、文件删除、云端协议和 29 个页面/流程回归场景。测试中的微信与云接口均为隔离模拟，不访问实际用户数据。
+
+`check:native` 使用本机微信开发者工具附带的 `wcc` / `wcsc` 编译全部 WXML、WXSS。默认适配本机 Windows 安装路径；其他安装目录可通过 `WECHAT_DEVTOOLS_PATH` 指定。此命令需要安装开发者工具，不在无该工具的 CI 中运行。
+
+这些检查不替代模拟器和真机验收。发布前仍需验证小屏布局、长文本、系统字体、键盘遮挡、位置授权、照片私有访问、断网恢复、两台设备同步及 AI 实际响应。审查基线、修改范围与剩余事项见 `docs/audit/`。
 
 ## GitHub 自动上传体验版
 
-推送到 `main` 分支后，GitHub Actions 会先运行完整检查，再使用 `miniprogram-ci` 上传微信小程序。首次运行版本号为 `1.0.0`，后续按工作流运行次数递增补丁版本（`1.0.1`、`1.0.2`……）；也可以在 Actions 页面手动触发。
+当前工作流在推送 `main` 或手动触发时，先运行 `npm run check`，再使用 `miniprogram-ci` 上传小程序。上传不部署云函数或权限。版本号按工作流运行次数递增。
 
-首次启用前需要完成一次配置：
-
-1. 在微信公众平台的“小程序代码上传”设置中生成 AppID `wx1574de4c1ef4b06a` 的上传密钥。
-2. 在 GitHub 仓库的 `Settings → Secrets and variables → Actions` 中新增 Repository secret：`WECHAT_MINIPROGRAM_PRIVATE_KEY`，值为上传密钥文件的完整内容。
-3. 如果微信公众平台启用了上传 IP 白名单，需确保 GitHub Actions Runner 的出口 IP 可以访问。
-
-上传密钥只保存在 GitHub Secret 中，不能提交到仓库；项目已忽略 `private.*.key` 文件。
+启用前，在微信公众平台生成对应 AppID 的代码上传密钥，并将完整内容保存为仓库 Secret `WECHAT_MINIPROGRAM_PRIVATE_KEY`；如启用上传 IP 白名单，还需配置 Runner 出口访问。密钥不能提交到仓库，项目已忽略 `private.*.key`。

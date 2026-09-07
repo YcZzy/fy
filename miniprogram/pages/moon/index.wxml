@@ -3,6 +3,8 @@
   <view class="hero-title">最近想靠近什么</view>
   <view class="hero-subtitle">没有进度条。次数、时长和感受，只用来回望。</view>
 
+  <view class="workspace-tabs"><button class="{{workspaceTab === 'plans' ? 'active' : ''}}" data-value="plans" bindtap="setWorkspaceTab">计划</button><button class="{{workspaceTab === 'wishes' ? 'active' : ''}}" data-value="wishes" bindtap="setWorkspaceTab">想做</button><button class="{{workspaceTab === 'actions' ? 'active' : ''}}" data-value="actions" bindtap="setWorkspaceTab">行动库</button></view>
+  <view wx:if="{{workspaceTab === 'plans'}}">
   <view class="section" wx:if="{{focusedPlans.length}}">
     <view class="section-head"><text class="section-title">最近关注</text><text class="section-note">最多三个</text></view>
     <scroll-view scroll-x class="focus-scroll" enhanced show-scrollbar="{{false}}">
@@ -26,39 +28,31 @@
         <view class="plan-dot"></view><view class="plan-copy"><text class="plan-name">{{item.name}}</text><text class="plan-meta">{{item.statusLabel}} · {{item.count}} 次 · {{item.duration}}</text></view><text class="chevron">›</text>
       </view>
     </view>
-    <view wx:else class="empty">这里还没有计划。<br/>想做的事情可以慢慢长出来。</view>
+    <view wx:else class="empty">“{{filterLabel}}”下还没有计划。<view>可以创建一段想体验的生活。</view></view>
   </view>
 
+  </view>
+  <view wx:if="{{workspaceTab === 'wishes'}}">
   <view class="section">
     <view class="section-head"><text class="section-title">想做清单</text><button class="ghost-btn" bindtap="addWish">＋ 记一件</button></view>
     <view class="wish-list glass-card">
       <view wx:for="{{wishes}}" wx:key="id" class="wish-row">
         <view class="wish-mark"></view><text class="wish-text">{{item.text}}</text>
-        <view class="wish-menu"><text data-id="{{item.id}}" data-action="chat" bindtap="wishAction">展开</text><text data-id="{{item.id}}" data-action="plan" bindtap="wishAction">转计划</text><text data-id="{{item.id}}" data-action="delete" bindtap="wishAction">删</text></view>
+        <view class="wish-menu"><text data-id="{{item.id}}" data-action="edit" bindtap="wishAction">编辑</text><text data-id="{{item.id}}" data-action="chat" bindtap="wishAction">展开</text><text data-id="{{item.id}}" data-action="plan" bindtap="wishAction">转计划</text><text data-id="{{item.id}}" data-action="delete" bindtap="wishAction">删</text></view>
       </view>
       <view wx:if="{{!wishes.length}}" class="empty">还没有记下模糊的愿望。</view>
     </view>
   </view>
 
-  <view class="section">
-    <view class="section-head"><text class="section-title">生活板块</text><text class="section-note">{{domains.length}} 个板块</text></view>
-    <view class="domain-grid">
-      <view wx:for="{{domains}}" wx:key="id" class="domain-card solid-card {{actionDomainId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="filterDomain"><view class="domain-icon" style="color: {{item.color}}">{{item.icon}}</view><text class="domain-name">{{item.name}}</text><text class="domain-count">{{item.actionCount}} 个行动</text></view>
+  </view>
+  <view wx:if="{{workspaceTab === 'actions'}}" class="section">
+    <view class="section-head"><text class="section-title">具体行动</text><button class="ghost-btn" bindtap="addAction">＋ 新行动</button></view>
+    <input class="input" value="{{actionQuery}}" placeholder="搜索行动名称" bindinput="onActionSearch"/>
+    <view class="chips domain-filters"><view class="chip {{!actionDomainId ? 'active' : ''}}" bindtap="clearActionFilters">全部板块</view><view wx:for="{{domains}}" wx:key="id" class="chip {{actionDomainId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="filterDomain">{{item.name}}</view></view>
+    <view class="action-list solid-card">
+      <view wx:for="{{actions}}" wx:key="id" class="library-row"><view class="library-copy" data-id="{{item.id}}" bindtap="openAction"><text class="library-name">{{item.name}}</text><text class="library-meta">{{item.domainName}} · {{item.minutes}} 分钟</text></view><view class="library-actions"><text data-id="{{item.id}}" catchtap="editAction">编辑</text><text data-id="{{item.id}}" catchtap="deleteAction">删除</text></view></view>
+      <view wx:if="{{!actions.length}}" class="empty">没有匹配的行动。<view>试试其他关键词，或添加一个。</view></view>
     </view>
   </view>
-
-  <view class="section">
-    <view class="section-head" bindtap="toggleActions"><text class="section-title">全部行动库</text><text class="section-note">{{actions.length}} 个 {{showActions ? '收起' : '展开'}} ›</text></view>
-    <view wx:if="{{showActions}}" class="action-list solid-card">
-      <view class="action-tools"><input value="{{actionQuery}}" placeholder="搜索行动" bindinput="onActionSearch"/><text wx:if="{{actionQuery || actionDomainId}}" bindtap="clearActionFilters">清除筛选</text></view>
-      <view wx:for="{{actions}}" wx:key="id" class="library-row">
-        <view class="library-copy" data-id="{{item.id}}" bindtap="openAction"><text class="library-name">{{item.name}}</text><text class="library-meta">{{item.domainName}} · {{item.minutes}} 分钟</text></view>
-        <view class="library-actions"><text data-id="{{item.id}}" catchtap="editAction">编辑</text><text class="delete-action" data-id="{{item.id}}" catchtap="deleteAction">删除</text></view>
-      </view>
-      <view wx:if="{{!actions.length}}" class="empty">没有找到合适的行动。</view>
-      <button class="secondary-btn add-action" bindtap="addAction">添加具体行动</button>
-    </view>
-  </view>
-
   <view class="ask-card glass-card" bindtap="openChat"><view class="ask-symbol">风</view><view><text class="ask-title">问风月</text><text class="ask-sub">把一句模糊的想法，展开一点</text></view><text class="chevron">›</text></view>
 </view></view>

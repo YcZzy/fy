@@ -33,3 +33,15 @@
 .reflection { position: relative; display: flex; flex-direction: column; gap: 14rpx; padding: 27rpx 60rpx 27rpx 27rpx; color: var(--muted); line-height: 1.65; }
 .reflection .section-title { color: var(--ink); }
 .reflection .chevron { position: absolute; right: 25rpx; top: 42%; }
+
+.plan-page { padding-bottom: calc(env(safe-area-inset-bottom) + 175rpx); }
+.save-dock { position: fixed; z-index: 10; bottom: 0; left: 0; right: 0; padding: 18rpx 30rpx calc(env(safe-area-inset-bottom) + 18rpx); background: var(--theme-surface-solid); border-top: 1rpx solid var(--theme-soft); }
+.save-dock button { width: 100%; }
+.save-hint { margin-top: 18rpx; color: var(--muted); line-height: 1.6; font-size: 23rpx; }
+.delete-plan { margin-top: 28rpx; width: 100%; }
+.clear-date { padding: 16rpx 24rpx; color: var(--theme-deep); font-weight: 400; }
+.focus-toggle>view:first-child { flex: 1; min-width: 0; }
+.switch { flex: 0 0 86rpx; margin-left: 20rpx; }
+.toggle-sub { line-height: 1.6; }
+.related-row>view:first-child { flex: 1; min-width: 0; }
+.relation-actions text { min-height: 62rpx; display: flex; align-items: center; padding: 0 14rpx; }

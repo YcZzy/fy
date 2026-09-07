@@ -13,3 +13,7 @@
 .data-overview text:first-child { font-size: 38rpx; }.data-overview text:last-child { color: var(--muted); font-size: 22rpx; }
 .delete-all { width: 100%; margin-top: 34rpx; }
 .privacy-note { margin: 28rpx 16rpx 0; color: var(--muted); font-size: 22rpx; line-height: 1.7; text-align: center; }
+
+.feedback-row { width: 100%; border-radius: 0; background: transparent; color: var(--ink); font-size: 27rpx; text-align: left; }
+.setting-row>view { max-width: none; flex: 1; min-width: 0; }
+.setting-sub { overflow-wrap: anywhere; }

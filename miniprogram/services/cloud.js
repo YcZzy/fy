@@ -1,4 +1,7 @@
 const env = require('../config/env')
+const photoWork = new Set()
+let uploadQueue = null
+let deleteWork = null
 
 function isReady() { return Boolean(env.CLOUD_ENV_ID && wx.cloud) }
 function isSyncReady() { return Boolean(isReady() && env.ENABLE_CLOUD_SYNC) }
@@ -23,12 +26,51 @@ async function saveLocalPhoto(tempFilePath) {
   })
 }
 
-async function persistPhoto(tempFilePath, footprintId) {
-  if (!tempFilePath) return { fileId: '', localPath: '' }
-  if (isReady()) {
-    try { return { fileId: await uploadFootprintPhoto(tempFilePath, footprintId), localPath: '' } } catch (error) { console.warn('云照片上传失败，保留本地副本', error) }
-  }
-  return { fileId: '', localPath: await saveLocalPhoto(tempFilePath) }
+function persistPhoto(tempFilePath, footprintId) {
+  const repository = require('./repository')
+  const token = repository.dataToken()
+  if (!repository.canApply(token)) return Promise.reject(new Error('PERSONAL_DATA_DELETION_PENDING'))
+  const operation = (async () => {
+    if (!tempFilePath) return { fileId: '', localPath: '' }
+    const localPath = await saveLocalPhoto(tempFilePath)
+    let fileId = ''
+    if (isReady()) {
+      try { fileId = await uploadFootprintPhoto(localPath, footprintId) }
+      catch (error) { warn('照片已保存在本机，联网后将继续上传', error) }
+    }
+    if (!repository.canApply(token)) {
+      if (fileId) {
+        try { await deleteCloudFiles([fileId]) }
+        catch (error) { const state = repository.getState(); state.pendingFileDeletes = [...new Set([...state.pendingFileDeletes, fileId])]; repository.saveState(state, { sync: false }) }
+      }
+      wx.removeSavedFile({ filePath: localPath, fail: () => {} })
+      throw new Error('DATA_CHANGED')
+    }
+    return { fileId, localPath }
+  })()
+  photoWork.add(operation); operation.then(() => photoWork.delete(operation), () => photoWork.delete(operation))
+  return operation
+}
+async function flushPendingUploads() {
+  if (!isReady()) return
+  if (uploadQueue) return uploadQueue
+  uploadQueue = (async () => {
+    const repository = require('./repository'); const token = repository.dataToken()
+    for (const item of repository.getState().footprints) {
+      if (!repository.canApply(token)) return
+      if ((item.photoFileIds || []).length || !(item.localPhotoPaths || []).length) continue
+      const path = item.localPhotoPaths[0]
+      const fileId = await uploadFootprintPhoto(path, item.id)
+      const current = repository.getState().footprints.find((value) => value.id === item.id)
+      if (repository.canApply(token) && current && (current.localPhotoPaths || [])[0] === path && !(current.photoFileIds || []).length) {
+        repository.update((state) => { const record = state.footprints.find((value) => value.id === item.id); record.photoFileIds = [fileId]; record.updatedAt = Date.now() })
+      } else {
+        try { await deleteCloudFiles([fileId]) }
+        catch (error) { const state = repository.getState(); state.pendingFileDeletes = [...new Set([...state.pendingFileDeletes, fileId])]; repository.saveState(state, { sync: false }) }
+      }
+    }
+  })().finally(() => { uploadQueue = null })
+  return uploadQueue
 }
 
 function fileDeleteSucceeded(item) {
@@ -39,12 +81,11 @@ function fileDeleteSucceeded(item) {
 
 async function deleteCloudFiles(fileIds) {
   if (!isReady() || !fileIds || !fileIds.length) return
-  const result = await wx.cloud.deleteFile({ fileList: fileIds })
-  const failed = (result.fileList || []).filter((item) => !fileDeleteSucceeded(item))
-  if (failed.length) {
-    const error = new Error('CLOUD_FILE_DELETE_INCOMPLETE')
-    error.details = failed
-    throw error
+  for (let index = 0; index < fileIds.length; index += 50) {
+    const batch = fileIds.slice(index, index + 50)
+    const result = await wx.cloud.deleteFile({ fileList: batch })
+    const failed = batch.filter((id) => !((result.fileList || []).some((item) => (item.fileID || item.fileId) === id && fileDeleteSucceeded(item))))
+    if (failed.length) { const error = new Error('CLOUD_FILE_DELETE_INCOMPLETE'); error.details = (result.fileList || []).filter((item) => failed.includes(item.fileID || item.fileId)); throw error }
   }
 }
 
@@ -55,24 +96,39 @@ async function flushPendingDeletes() {
   const fileIds = state.pendingFileDeletes || []
   if (!fileIds.length) return
   await deleteCloudFiles(fileIds)
-  repository.update((value) => { value.pendingFileDeletes = [] })
+  if (!repository.getState().deletionPending) repository.update((value) => { value.pendingFileDeletes = value.pendingFileDeletes.filter((id) => !fileIds.includes(id)) })
 }
 
 async function getPhotoUrls(fileIds) {
   if (!isReady() || !fileIds || !fileIds.length) return {}
-  const result = await wx.cloud.getTempFileURL({ fileList: fileIds })
-  return (result.fileList || []).reduce((map, item) => { if (item.fileID && item.tempFileURL) map[item.fileID] = item.tempFileURL; return map }, {})
-}
-
-async function deleteAllPersonalData() {
-  if (!isReady()) return { localOnly: true }
-  const response = await wx.cloud.callFunction({ name: 'dataManager', data: { action: 'deleteAll', confirm: 'DELETE_MY_DATA' } })
-  if (!response.result || response.result.code !== 0 || response.result.deleted !== true) {
-    const error = new Error('CLOUD_DELETE_INCOMPLETE')
-    error.details = response.result && response.result.failures
-    throw error
+  const unique = [...new Set(fileIds)]; const urls = {}
+  for (let index = 0; index < unique.length; index += 50) {
+    const result = await wx.cloud.getTempFileURL({ fileList: unique.slice(index, index + 50) })
+    ;(result.fileList || []).forEach((item) => { if (item.fileID && item.tempFileURL) urls[item.fileID] = item.tempFileURL })
   }
-  return response.result
+  return urls
 }
 
-module.exports = { isReady, isSyncReady, persistPhoto, deleteCloudFiles, flushPendingDeletes, getPhotoUrls, deleteAllPersonalData, errorMessage, warn }
+function deleteAllPersonalData() {
+  if (deleteWork) return deleteWork
+  deleteWork = (async () => {
+    const repository = require('./repository'); const sync = require('./sync')
+    const state = repository.getState()
+    const requestId = state.deleteRequestId || require('./format').uid('delete')
+    repository.markDeletion(true, requestId)
+    await sync.prepareDelete()
+    await Promise.allSettled([...photoWork, uploadQueue].filter(Boolean))
+    if (!isReady()) return { localOnly: true, epoch: state.cloudEpoch }
+    const begin = await wx.cloud.callFunction({ name: 'dataManager', data: { action: 'beginDelete', requestId } })
+    const value = begin.result
+    if (!value || value.protocol !== 2 || value.code !== 0) throw new Error((value && value.message) || '请更新云端 dataManager 后重试')
+    const fresh = repository.getState()
+    const files = [...new Set([...(value.fileIds || []), ...fresh.pendingFileDeletes, ...fresh.footprints.reduce((all, item) => all.concat(item.photoFileIds || []), [])])]
+    await deleteCloudFiles(files)
+    const response = await wx.cloud.callFunction({ name: 'dataManager', data: { action: 'deleteAll', confirm: 'DELETE_MY_DATA', requestId: value.requestId, epoch: value.epoch } })
+    if (!response.result || response.result.code !== 0 || !response.result.deleted) throw new Error((response.result && response.result.message) || '云端删除尚未完成')
+    return response.result
+  })().finally(() => { deleteWork = null })
+  return deleteWork
+}
+module.exports = { isReady, isSyncReady, persistPhoto, flushPendingUploads, deleteCloudFiles, flushPendingDeletes, getPhotoUrls, deleteAllPersonalData, errorMessage, warn }

@@ -1,22 +1,17 @@
 <view class="chat-page context-page theme-{{theme}}">
-  <view class="chat-head"><view><text class="eyebrow">温和地把想法展开</text><text class="chat-title">问风月</text></view><button class="ghost-btn" bindtap="clearConversation">清空</button></view>
+  <view class="chat-head"><view><text class="eyebrow">温和地把想法展开</text><text class="chat-title">问风月</text></view><view class="chat-tools"><button class="ghost-btn" bindtap="newConversation">新对话</button><button class="ghost-btn" bindtap="toggleHistory">历史</button><button class="ghost-btn" bindtap="clearConversation">清空</button></view></view>
   <scroll-view scroll-y class="message-scroll" scroll-into-view="{{scrollInto}}" enhanced>
     <view class="message-inner">
-      <view wx:if="{{!messages.length}}" class="chat-welcome">
-        <view class="wind-mark">风</view><text class="welcome-line">这一小时还没有名字。</text><text class="muted">可以问一件具体的事，也可以只是说说现在的感觉。</text>
-        <view class="quick-grid"><view wx:for="{{quick}}" wx:key="*this" class="quick-item" data-value="{{item}}" bindtap="useQuick">{{item}}</view></view>
-        <view wx:if="{{history.length}}" class="history-list"><text class="history-title">最近对话</text><view wx:for="{{history}}" wx:key="id" class="history-row"><text class="history-name" data-id="{{item.id}}" bindtap="openConversation">{{item.title}}</text><text class="history-delete" data-id="{{item.id}}" bindtap="deleteConversation">删除</text></view></view>
+      <view wx:if="{{showHistory}}" class="history-list"><text class="history-title">历史对话（{{historyCount}}）</text><view wx:for="{{history}}" wx:key="id" class="history-row"><view class="history-name" data-id="{{item.id}}" bindtap="openConversation"><text>{{item.title}}</text><view class="muted">{{item.dateLabel}}{{item.draft ? ' · 有未保存草稿' : ''}}</view></view><button class="ghost-btn" data-id="{{item.id}}" bindtap="deleteConversation">删除</button></view><view wx:if="{{!history.length}}" class="empty">还没有保存的对话。</view><button wx:if="{{history.length < historyCount}}" class="ghost-btn" bindtap="moreHistory">更多历史</button></view>
+      <view wx:else>
+        <view wx:if="{{!messages.length}}" class="chat-welcome"><view class="wind-mark">风</view><text class="welcome-line">这一小时还没有名字。</text><text class="muted">问一件具体的事，或说说现在的感觉。</text><view class="quick-grid"><view wx:for="{{quick}}" wx:key="*this" class="quick-item" data-value="{{item}}" bindtap="useQuick">{{item}}</view></view></view>
+        <view wx:for="{{messages}}" wx:key="id" id="{{item.id}}" class="message-row {{item.role}}" data-id="{{item.id}}" bindlongpress="messageMenu"><view class="bubble {{item.failed ? 'failed' : ''}}">{{item.content}}</view></view>
+        <view wx:if="{{messages.length && !sending && (messages[messages.length - 1].failed || messages[messages.length - 1].role === 'user')}}" class="button-row retry-row"><button class="secondary-btn" bindtap="retryMessage">重试回复</button><button class="secondary-btn" bindtap="keepThought">记到想做清单</button></view>
+        <view wx:if="{{sending}}" class="message-row assistant"><view class="bubble typing"><text></text><text></text><text></text></view></view>
+        <view wx:if="{{draft}}" class="draft-card glass-card"><text class="draft-eyebrow">等待确认 · {{draft.type === 'plan' ? '计划草稿' : '行动草稿'}}</text><text class="draft-name">{{draft.name}}</text><text wx:if="{{draft.why}}" class="draft-why">{{draft.why}}</text><text wx:if="{{draft.minutes && draft.type === 'action'}}" class="draft-meta">预计 {{draft.minutes}} 分钟 · {{draft.preparation}}</text><view class="draft-actions"><button class="ghost-btn" bindtap="discardDraft">不保存</button><button class="secondary-btn" bindtap="editDraft">修改</button><button class="primary-btn" bindtap="saveDraft">确认保存</button></view></view>
+        <button wx:if="{{savedTarget}}" class="secondary-btn saved-target" bindtap="openSaved">{{savedTarget.type === 'plan' ? '查看刚保存的计划' : '看看这个行动，准备开始'}}</button>
       </view>
-      <view wx:for="{{messages}}" wx:key="id" id="{{item.id}}" class="message-row {{item.role}}" data-id="{{item.id}}" bindlongpress="messageMenu">
-        <view class="bubble {{item.failed ? 'failed' : ''}}">{{item.content}}</view>
-      </view>
-      <view wx:if="{{sending}}" class="message-row assistant"><view class="bubble typing"><text></text><text></text><text></text></view></view>
-      <view wx:if="{{draft}}" class="draft-card glass-card">
-        <text class="draft-eyebrow">等待你的确认 · {{draft.type === 'plan' ? '计划草稿' : '行动草稿'}}</text>
-        <text class="draft-name">{{draft.name}}</text><text wx:if="{{draft.why}}" class="draft-why">{{draft.why}}</text><text wx:if="{{draft.minutes}}" class="draft-meta">预计 {{draft.minutes}} 分钟</text>
-        <view class="draft-actions"><button class="ghost-btn" bindtap="discardDraft">不保存</button><button class="secondary-btn" bindtap="editDraft">修改后保存</button><button class="primary-btn" bindtap="saveDraft">确认保存</button></view>
-      </view>
-      <view class="scroll-spacer"></view>
+      <view id="conversation-bottom" class="scroll-spacer"></view>
     </view>
   </scroll-view>
   <view class="composer"><textarea auto-height maxlength="500" cursor-spacing="20" value="{{input}}" placeholder="说说你现在在想什么…" placeholder-class="placeholder" bindinput="onInput" confirm-type="send" bindconfirm="send"></textarea><button class="send-btn" disabled="{{!input || sending}}" bindtap="send">↑</button></view>

@@ -8,7 +8,13 @@ const INTEREST_DOMAINS = {
 }
 
 Page({
-  data: { step: 0, interests: INTERESTS, selected: [], selectedMap: {}, customInterest: '', wish: '', previewActions: [] },
+  data: { step: 0, interests: INTERESTS, selected: [], selectedMap: {}, customInterest: '', wish: '', previewActions: [], editing: false, topInset: 64 },
+  onLoad(options = {}) {
+    this.token = repository.dataToken()
+    const state = repository.getState(); const selected = options.edit ? state.preferences.selectedInterests || [] : []
+    const capsule = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null
+    this.setData({ editing: Boolean(options.edit), step: options.edit ? 1 : 0, selected, interests: [...new Set([...INTERESTS, ...selected])], selectedMap: selected.reduce((map, item) => { map[item] = true; return map }, {}), topInset: capsule ? capsule.bottom + 12 : 64 })
+  },
   onShow() { if (this.data.step === 3) this.refreshPreview() },
   toggleInterest(event) {
     const value = event.currentTarget.dataset.value
@@ -26,7 +32,10 @@ Page({
     this.setData({ interests, selected, selectedMap, customInterest: '' })
   },
   onWishInput(event) { this.setData({ wish: event.detail.value }) },
+  back() { if (this.data.step > 0) this.setData({ step: this.data.step - 1 }) },
   next() {
+    if (this.data.customInterest.trim()) this.addCustomInterest()
+    if (this.data.editing) { this.finish(); return }
     if (this.data.step < 3) {
       const step = this.data.step + 1
       this.setData({ step }, () => { if (step === 3) this.refreshPreview() })
@@ -48,9 +57,11 @@ Page({
     repository.hideAction(event.currentTarget.dataset.id)
     this.refreshPreview()
   },
-  skip() { this.finish() },
+  skip() { if (this.data.editing) wx.navigateBack(); else this.finish() },
   finish() {
+    if (!repository.canApply(this.token)) { wx.switchTab({ url: '/pages/now/index' }); return }
+    if (this.data.customInterest.trim()) this.addCustomInterest()
     repository.completeOnboarding(this.data.selected, this.data.wish)
-    wx.switchTab({ url: '/pages/now/index' })
+    if (this.data.editing) wx.navigateBack(); else wx.switchTab({ url: '/pages/now/index' })
   }
 })

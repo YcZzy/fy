@@ -32,7 +32,7 @@ for (const forbidden of ['.includes(', '.slice(', '.map(']) {
 for (const page of app.pages) {
   const js = fs.readFileSync(path.join(root, 'miniprogram', `${page}.js`), 'utf8')
   const markup = fs.readFileSync(path.join(root, 'miniprogram', `${page}.wxml`), 'utf8')
-  const handlers = [...markup.matchAll(/bind(?:tap|input|change|confirm|longpress)="([A-Za-z_$][\w$]*)"/g)].map((match) => match[1])
+  const handlers = [...markup.matchAll(/(?:bind|catch):?(?:tap|input|change|confirm|longpress|submit|blur|focus|scrolltolower)="([A-Za-z_$][\w$]*)"/g)].map((match) => match[1])
   for (const handler of new Set(handlers)) {
     if (!new RegExp(`\\b${handler}\\s*\\(`).test(js)) throw new Error(`${page}.wxml 绑定了不存在的方法: ${handler}`)
   }

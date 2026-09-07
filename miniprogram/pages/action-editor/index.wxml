@@ -15,5 +15,5 @@
     <view class="field-label">需要准备</view><input class="input" maxlength="60" value="{{action.preparation}}" placeholder="例如：耳机或一双舒服的鞋" bindinput="onPreparation"/>
   </view>
   <button class="primary-btn save-action" bindtap="save">保存行动</button>
-  <button wx:if="{{!isNew && action.source !== 'system'}}" class="danger-btn delete-action" bindtap="remove">删除行动</button>
+  <button wx:if="{{!isNew}}" class="danger-btn delete-action" bindtap="remove">删除行动</button>
 </view></view>

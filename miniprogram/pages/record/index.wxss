@@ -23,3 +23,11 @@
 .location-preview { display: flex; justify-content: space-between; margin-top: 14rpx; padding: 18rpx 22rpx; border-radius: 18rpx; background: rgba(255,255,255,.55); font-size: 24rpx; }
 .save-btn { margin-top: 36rpx; }
 .skip-btn { margin-top: 12rpx; width: 100%; color: var(--muted); }
+
+.record-date { padding: 20rpx 24rpx; margin-top: 22rpx; background: rgba(255,255,255,.6); border-radius: 20rpx; color: var(--muted); font-size: 25rpx; }
+.details-toggle { width: 100%; margin-top: 28rpx; }
+.again-row { gap: 14rpx; flex-wrap: wrap; }
+.attachment { min-width: 0; padding: 16rpx; }
+.attachment>text:last-child { min-width: 0; overflow-wrap: break-word; }
+.location-preview { gap: 18rpx; }
+.location-preview .remove { flex-shrink: 0; padding: 12rpx; }

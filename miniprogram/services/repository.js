@@ -73,6 +73,11 @@ function normalizeState(state) {
   setDefault('pendingFileDeletes', [])
   setDefault('syncQueue', [])
   setDefault('syncTombstones', {})
+  setDefault('cloudEpoch', 0)
+  setDefault('dataToken', uid('data'))
+  setDefault('deletionPending', false)
+  setDefault('lastSyncedAt', 0)
+  state.preferences = { ...initial.preferences, ...state.preferences, lastContext: { ...initial.preferences.lastContext, ...state.preferences.lastContext } }
 
   const plansById = new Map((state.plans || []).map((plan) => [plan.id, plan]))
   state.plans.forEach((plan) => {
@@ -129,6 +134,7 @@ function saveState(state, options = {}) {
 }
 function update(mutator) {
   const state = getState()
+  if (state.deletionPending) throw new Error('PERSONAL_DATA_DELETION_PENDING')
   const before = JSON.parse(JSON.stringify(state))
   // repository 的更新器只允许原地修改状态；忽略 push/unshift 等方法的数字返回值。
   mutator(state)
@@ -165,6 +171,11 @@ function declineAction(actionId, contextKey = '') {
 function startSession(action, mode, options = {}) {
   const now = Date.now()
   return update((state) => {
+    const existing = state.activeSession || state.pendingAction
+    if (existing) {
+      if (existing.actionId === action.id) return
+      throw new Error('SESSION_ALREADY_ACTIVE')
+    }
     if (mode === 'timer') {
       state.activeSession = { id: uid('s'), actionId: action.id, actionName: action.name, actionSnapshot: action, startedAt: now, expectedEndAt: now + action.minutes * 60000, status: 'running', reminder: Boolean(options.reminder), reminderPrompted: false }
       state.pendingAction = null
@@ -180,7 +191,7 @@ function markPendingActionBackgrounded() {
 }
 function pauseSession() {
   return update((state) => {
-    if (!state.activeSession) return
+    if (!state.activeSession || state.activeSession.status !== 'running') return
     state.activeSession.pausedAt = Date.now()
     state.activeSession.elapsedBeforePause = Math.max(0, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
     state.activeSession.status = 'paused'
@@ -190,6 +201,7 @@ function resumeSession() {
   return update((state) => {
     const session = state.activeSession
     if (!session || session.status !== 'paused') return
+    session.expectedEndAt += Math.max(0, Date.now() - (session.pausedAt || Date.now()))
     session.startedAt = Date.now() - (session.elapsedBeforePause || 0) * 1000
     session.status = 'running'
     delete session.pausedAt
@@ -204,9 +216,10 @@ function reconcileActiveSession() {
 }
 function addFootprint(payload) {
   return update((state) => {
+    if (payload.id && state.footprints.some((item) => item.id === payload.id)) return
     state.footprints.unshift({ createdAt: Date.now(), updatedAt: Date.now(), ...payload, id: payload.id || uid('f') })
-    state.activeSession = null
-    state.pendingAction = null
+    if (payload.sessionId && state.activeSession && state.activeSession.id === payload.sessionId) state.activeSession = null
+    if (payload.sessionId && state.pendingAction && state.pendingAction.id === payload.sessionId) state.pendingAction = null
     const plan = state.plans.find((item) => item.id === payload.planId)
     if (plan) plan.updatedAt = Date.now()
   })
@@ -216,8 +229,6 @@ function saveFootprint(payload) {
     const index = state.footprints.findIndex((item) => item.id === payload.id)
     if (index >= 0) state.footprints[index] = { ...state.footprints[index], ...payload, updatedAt: Date.now() }
     else state.footprints.unshift({ createdAt: Date.now(), updatedAt: Date.now(), ...payload, id: payload.id || uid('f') })
-    state.activeSession = null
-    state.pendingAction = null
   })
 }
 function deleteFootprint(id) {
@@ -237,6 +248,15 @@ function savePlan(plan) {
 }
 function addWish(text) { return update((state) => { state.wishes.unshift({ id: uid('w'), text: text.trim(), createdAt: Date.now() }) }) }
 function deleteWish(id) { return update((state) => { state.wishes = state.wishes.filter((item) => item.id !== id) }) }
+function editWish(id, text) { return update((state) => { const wish = state.wishes.find((item) => item.id === id); if (wish) { wish.text = text.trim(); wish.updatedAt = Date.now() } }) }
+function deletePlan(id) {
+  return update((state) => {
+    const plan = state.plans.find((item) => item.id === id)
+    if (!plan) return
+    state.footprints.forEach((item) => { if (item.planId === id && !item.planName) { item.planName = plan.name; item.updatedAt = Date.now() } })
+    state.plans = state.plans.filter((item) => item.id !== id)
+  })
+}
 function saveActionWithPlans(action, planIds = []) {
   const actionId = action.id || uid('a')
   return update((state) => {
@@ -302,11 +322,23 @@ function saveConversation(conversation) {
   })
 }
 function clearConversations() { return update((state) => { state.conversations = [] }) }
-function deleteAllPersonalData() {
+function deleteAllPersonalData(epoch = 0) {
+  const previous = getState()
+  if (wx.removeSavedFile) previous.footprints.forEach((item) => (item.localPhotoPaths || []).forEach((filePath) => wx.removeSavedFile({ filePath, fail: () => {} })))
+  const sync = require('./sync')
+  if (sync.reset) sync.reset()
   const clean = createInitialState()
-  clean.preferences.onboardingComplete = false
+  clean.cloudEpoch = epoch
   wx.setStorageSync(STORAGE_KEY, clean)
   return clean
+}
+function dataToken() { return getState().dataToken }
+function canApply(token) { const state = getState(); return !state.deletionPending && state.dataToken === token }
+function markDeletion(pending, requestId) {
+  const state = getState()
+  state.deletionPending = pending
+  if (requestId) state.deleteRequestId = requestId
+  return saveState(state, { sync: false })
 }
 
 module.exports = {
@@ -315,5 +347,5 @@ module.exports = {
   pauseSession, resumeSession, clearSession, resolvePending, reconcileActiveSession,
   addFootprint, saveFootprint, deleteFootprint, queueFileDeletes, savePlan, addWish, deleteWish, saveReview,
   saveAction, saveActionWithPlans, setPlanAction, hideAction, deleteAction, saveConversation, clearConversations, deleteAllPersonalData, updateReview, deleteReview,
-  changedCollections, normalizeState
+  changedCollections, normalizeState, deletePlan, editWish, dataToken, canApply, markDeletion
 }

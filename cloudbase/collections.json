@@ -7,5 +7,6 @@
   "footprints",
   "reviews",
   "ai_conversations",
-  "ai_usage"
+  "ai_usage",
+  "sync_control"
 ]

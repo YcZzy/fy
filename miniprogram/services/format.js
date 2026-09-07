@@ -8,7 +8,7 @@ function dateLabel(timestamp) {
   const today = dateKey(Date.now())
   const target = dateKey(timestamp)
   if (target === today) return '今天'
-  return `${d.getMonth() + 1}月${d.getDate()}日`
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
 }
 function duration(minutes) {
   if (minutes === null || minutes === undefined) return '未记录时长'

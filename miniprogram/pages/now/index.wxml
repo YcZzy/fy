@@ -11,40 +11,30 @@
   </view>
 
   <view wx:if="{{activeSession}}" class="active-card glass-card" bindtap="openActive">
-    <view><text class="active-dot"></text><text class="active-label">正在{{activeSession.status === 'paused' ? '暂停' : '计时'}}</text></view>
+    <view><text class="active-dot"></text><text class="active-label">{{activeSession.status === 'paused' ? '计时已暂停' : '正在计时'}}</text></view>
     <view class="active-main"><text class="active-name">{{activeSession.actionName}}</text><text class="active-time">{{activeElapsed}}</text></view>
   </view>
 
-  <view class="section" wx:if="{{continueActions.length}}">
-    <view class="section-head"><text class="section-title">继续一下</text><text class="section-note">最近关注计划里的行动</text></view>
-    <scroll-view scroll-x class="focus-scroll" enhanced show-scrollbar="{{false}}">
-      <view class="focus-row">
-        <view wx:for="{{continueActions}}" wx:key="id" class="focus-card" data-id="{{item.id}}" data-plan-id="{{item.planId}}" bindtap="continueAction">
-          <view class="focus-top"><text class="tag">{{item.domainName}}</text><text class="focus-count">{{item.duration}}</text></view>
-          <view class="focus-name">{{item.name}}</view>
-          <view class="focus-last">来自「{{item.planName}}」</view>
-          <view class="focus-meta">{{item.suitableNow ? '适合现在的状态' : '也可以留到合适的时候'}}</view>
-          <view class="small-action" hover-class="small-action-hover" aria-role="button" aria-label="开始这个行动">开始这个行动 <text>→</text></view>
-        </view>
-      </view>
-    </scroll-view>
+  <view wx:if="{{pendingAction}}" class="pending-card glass-card card-pad">
+    <text class="section-note">刚才去做的事 · 等你回来记录</text><view class="pending-name">{{pendingAction.actionName}}</view>
+    <view class="button-row"><button class="primary-btn" bindtap="openPending">留个足迹</button><button class="secondary-btn" bindtap="dismissPending">结束，不记录</button></view>
   </view>
-
   <view class="section">
     <view class="section-head"><text class="section-title">现在的状态</text><text class="section-note">只选此刻，不替未来决定</text></view>
     <view class="state-card glass-card card-pad">
       <view class="field-label first">有多少时间</view>
-      <view class="chips"><view wx:for="{{timeOptions}}" wx:key="value" class="chip {{context.minutes === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectTime">{{item.label}}</view></view>
+      <view class="chips"><view wx:for="{{timeOptions}}" wx:key="value" class="chip {{context.minutes === item.value || (item.value === -1 && customTime) ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectTime">{{item.value === -1 && customTime ? context.minutes + " 分钟" : item.label}}</view></view>
       <view class="field-label">现在的力气</view>
       <view class="chips"><view wx:for="{{energyOptions}}" wx:key="value" class="chip {{context.energy === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectEnergy">{{item.label}}</view></view>
       <view class="field-label">在哪里</view>
       <view class="chips"><view wx:for="{{envOptions}}" wx:key="value" class="chip {{context.environment === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectEnvironment">{{item.label}}</view></view>
+      <view wx:if="{{context.locationSummary}}" class="location-summary"><text>已选地区：{{context.locationSummary}}</text><button class="ghost-btn" bindtap="clearLocation">清除</button></view>
       <textarea class="context-input" auto-height maxlength="120" placeholder="还可以说一句：今晚只想休息，或最不想做什么…" placeholder-class="placeholder" value="{{context.note}}" bindinput="onNoteInput"></textarea>
     </view>
     <button class="primary-btn generate-btn {{generating ? 'breathing' : ''}}" loading="{{generating}}" bindtap="generate">{{generating ? '正在听风…' : '看看此刻能做什么'}}</button>
   </view>
 
-  <view wx:if="{{recommendations.length}}" class="section results">
+  <view wx:if="{{recommendations.length}}" class="section results" id="recommendations">
     <view class="section-head"><text class="section-title">此刻可做</text><button class="ghost-btn" bindtap="swapGroup">换一组</button></view>
     <view wx:for="{{recommendations}}" wx:key="id" class="recommend-card solid-card">
       <view class="recommend-accent" style="background: {{item.domainColor}}"></view>
@@ -62,6 +52,22 @@
         </view>
       </view>
     </view>
+  </view>
+
+  <view wx:if="{{hasGenerated && !recommendations.length && !generating}}" class="empty glass-card" id="recommendations">暂时没有符合这些条件的行动。<view>可以调整时间和环境，或添加一件想做的事。</view><button class="secondary-btn" bindtap="addAction">添加行动</button></view>
+  <view class="section" wx:if="{{continueActions.length}}">
+    <view class="section-head"><text class="section-title">继续一下</text><text class="section-note">最近关注计划里的行动</text></view>
+    <scroll-view scroll-x class="focus-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="focus-row">
+        <view wx:for="{{continueActions}}" wx:key="id" class="focus-card" data-id="{{item.id}}" data-plan-id="{{item.planId}}" bindtap="continueAction">
+          <view class="focus-top"><text class="tag">{{item.domainName}}</text><text class="focus-count">{{item.duration}}</text></view>
+          <view class="focus-name">{{item.name}}</view>
+          <view class="focus-last">来自「{{item.planName}}」</view>
+          <view class="focus-meta">{{item.suitableNow ? '适合现在的状态' : '也可以留到合适的时候'}}</view>
+          <view class="small-action" hover-class="small-action-hover" aria-role="button" aria-label="看看这个行动">看看这个行动 <text>→</text></view>
+        </view>
+      </view>
+    </scroll-view>
   </view>
 
   <view class="ask-card glass-card" bindtap="openChat">

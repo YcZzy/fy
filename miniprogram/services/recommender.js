@@ -19,7 +19,7 @@ function contextKey(context) {
 
 function withPresentation(action, state, reason) {
   const domain = state.domains.find((item) => item.id === action.domainId)
-  const plan = state.plans.find((item) => item.id === action.planId) || state.plans.find((item) => item.focused && item.status !== 'ended' && (item.actionIds || []).includes(action.id)) || state.plans.find((item) => (item.actionIds || []).includes(action.id))
+  const plan = state.plans.find((item) => item.id === action.planId) || state.plans.find((item) => item.focused && !['ended', 'paused'].includes(item.status) && (item.actionIds || []).includes(action.id)) || state.plans.find((item) => (item.actionIds || []).includes(action.id))
   return {
     ...action,
     domainName: domain ? domain.name : '生活',
@@ -60,7 +60,7 @@ function isEligible(action, state, context, options = {}) {
   if (!action || action.hidden || action.minutes > context.minutes || !action.energy.includes(context.energy)) return false
   if (!options.ignoreDeclined && declinedIds(state, context).has(action.id)) return false
   if (!['any', 'location', 'manual'].includes(context.environment) && !action.environments.includes(context.environment) && !action.environments.includes('any')) return false
-  if (context.environment === 'location' && !action.environments.some((item) => ['outdoor', 'location', 'any'].includes(item))) return false
+  if (['location', 'manual'].includes(context.environment) && !action.environments.some((item) => ['outdoor', 'location', 'any'].includes(item))) return false
   return true
 }
 
@@ -76,13 +76,16 @@ function recentPenalty(action, state) {
 
 function score(action, state, context) {
   let value = 100 - Math.abs(context.minutes - action.minutes) * 0.35
-  const focused = state.plans.some((item) => item.focused && item.status !== 'ended' && (item.actionIds || []).includes(action.id))
+  const focused = state.plans.some((item) => item.focused && !['ended', 'paused'].includes(item.status) && (item.actionIds || []).includes(action.id))
   if (focused) value += 26
   if (action.minutes <= 15) value += 8
   if (context.energy === 'low' && action.energy.includes('low')) value += 10
   const selectedDomains = new Set((state.preferences.selectedInterests || []).map((item) => INTEREST_DOMAINS[item]).filter(Boolean))
   if (selectedDomains.has(action.domainId)) value += 14
   value -= recentPenalty(action, state)
+  const lastPreference = state.footprints.find((item) => item.actionId === action.id && item.doAgain)
+  if (lastPreference && lastPreference.doAgain === 'no') value -= 30
+  if (lastPreference && lastPreference.doAgain === 'yes') value += 10
   return value + Math.random() * 6
 }
 
@@ -92,8 +95,9 @@ function pick(items, used, predicate) {
   return found
 }
 
-function recommend(state, context) {
-  let candidates = eligibleActions(state, context).sort((a, b) => score(b, state, context) - score(a, state, context))
+function recommend(state, context, options = {}) {
+  const previous = new Set(options.previousIds || [])
+  let candidates = eligibleActions(state, context).map((item) => ({ item, score: score(item, state, context) - (previous.has(item.id) ? 100 : 0) })).sort((a, b) => b.score - a.score).map((entry) => entry.item)
   const intents = intentDomains(context.note)
   candidates = candidates.filter((item) => !intents.exclude.includes(item.domainId))
   if (intents.include.length) candidates.sort((a, b) => Number(intents.include.includes(b.domainId)) - Number(intents.include.includes(a.domainId)))
@@ -105,7 +109,7 @@ function recommend(state, context) {
   if (intents.include.length) {
     candidates.filter((item) => intents.include.includes(item.domainId)).slice(0, 5).forEach((item) => add(pick(candidates, used, (x) => x.id === item.id), '你刚才说的，更像是想把时间交给这件事。'))
   } else {
-    add(pick(candidates, used, (item) => state.plans.some((plan) => plan.focused && plan.status !== 'ended' && (plan.actionIds || []).includes(item.id))), '从最近关注的计划里，轻轻往前走一步。')
+    add(pick(candidates, used, (item) => state.plans.some((plan) => plan.focused && !['ended', 'paused'].includes(plan.status) && (plan.actionIds || []).includes(item.id))), '从最近关注的计划里，轻轻往前走一步。')
     add(pick(candidates, used, (item) => item.minutes <= 15 || DOMAIN_GROUPS.light.includes(item.domainId)), '门槛不高，现在开始也来得及。')
     add(pick(candidates, used, (item) => DOMAIN_GROUPS.body.includes(item.domainId)), '让身体和眼睛换一换此刻的风景。')
     add(pick(candidates, used, (item) => DOMAIN_GROUPS.focus.includes(item.domainId)), '也许可以把一点时间交给好奇心。')
@@ -117,30 +121,24 @@ function recommend(state, context) {
 
 function normalizeAiRecommendations(rawItems, state, context) {
   if (!Array.isArray(rawItems)) return []
-  const plansById = new Map(state.plans.map((item) => [item.id, item]))
-  const domainIds = new Set(state.domains.map((item) => item.id))
-  const intents = intentDomains(context.note)
-  return rawItems.filter((item) => item && typeof item.name === 'string' && item.name.trim().length >= 3)
-    .map((item) => {
-      const domainId = domainIds.has(item.domainId) ? item.domainId : 'daily'
-      const plan = plansById.get(item.planId)
-      return {
-        id: uid('ai_action'),
-        name: item.name.trim().slice(0, 30),
-        domainId,
-        minutes: Math.max(5, Math.min(context.minutes, Number(item.minutes) || context.minutes)),
-        energy: [context.energy],
-        environments: [['location', 'manual'].includes(context.environment) ? 'location' : context.environment],
-        preparation: String(item.preparation || '不需要额外准备').slice(0, 50),
-        planId: plan && plan.status !== 'ended' && plan.domainId === domainId ? plan.id : '',
-        source: 'ai',
-        reason: String(item.reason || '它与此刻的状态刚好合拍。').slice(0, 70),
-        locationNote: String(item.locationNote || '').slice(0, 70)
-      }
-    })
-    .filter((item) => item.minutes <= context.minutes && !intents.exclude.includes(item.domainId))
-    .slice(0, 5)
-    .map((item) => withPresentation(item, state, item.reason))
+  const domainIds = new Set(state.domains.filter((item) => !item.hidden).map((item) => item.id))
+  const intents = intentDomains(context.note); const used = new Set(); const names = new Set()
+  return rawItems.filter((item) => item && typeof item.name === 'string' && item.name.trim().length >= 2).map((item) => {
+    const name = item.name.trim().slice(0, 30)
+    const existing = state.actions.find((value) => value.id === item.actionId || value.id === item.id) || state.actions.find((value) => value.name.trim().toLowerCase() === name.toLowerCase())
+    const domainId = existing ? existing.domainId : (domainIds.has(item.domainId) ? item.domainId : 'daily')
+    const plan = state.plans.find((value) => value.id === item.planId && !['ended', 'paused'].includes(value.status) && value.domainId === domainId)
+    const action = existing ? { ...existing } : {
+      id: uid('ai_action'), name, domainId,
+      minutes: Math.max(1, Math.min(context.minutes, Math.round(Number(item.minutes) || context.minutes))),
+      energy: [context.energy], environments: [['location', 'manual'].includes(context.environment) ? 'location' : context.environment],
+      preparation: String(item.preparation || '不需要额外准备').slice(0, 60), source: 'ai'
+    }
+    return { ...action, planId: plan ? plan.id : '', reason: String(item.reason || '它与此刻的状态刚好合拍。').slice(0, 100) }
+  }).filter((item) => {
+    const key = item.name.trim().toLowerCase()
+    if (!isEligible(item, state, context) || intents.exclude.includes(item.domainId) || used.has(item.id) || names.has(key)) return false
+    used.add(item.id); names.add(key); return true
+  }).slice(0, 5).map((item) => withPresentation(item, state, item.reason))
 }
-
 module.exports = { contextKey, recommend, normalizeAiRecommendations, isEligible, intentDomains }

@@ -3,20 +3,23 @@
   <view class="hero-title">回头看时，都是来路</view>
   <view class="hero-subtitle">做了一部分，也值得留下一笔。</view>
 
+  <button class="secondary-btn add-record" bindtap="addRecord">＋ 补记一段生活</button>
   <view class="view-tabs"><view class="view-tab {{tab === 'timeline' ? 'active' : ''}}" data-value="timeline" bindtap="setTab">时光</view><view class="view-tab {{tab === 'review' ? 'active' : ''}}" data-value="review" bindtap="setTab">回望</view></view>
 
   <view wx:if="{{tab === 'timeline'}}" class="timeline">
+    <view class="timeline-tools glass-card card-pad"><input class="input" value="{{query}}" placeholder="搜索行动、感受文字或生活板块" bindinput="onSearch"/><view class="timeline-filters"><picker mode="date" value="{{filterStart}}" bindchange="onFilterStart"><text>{{filterStart || '开始日期'}}</text></picker><text>至</text><picker mode="date" value="{{filterEnd}}" bindchange="onFilterEnd"><text>{{filterEnd || '结束日期'}}</text></picker></view><view class="timeline-filters"><picker range="{{plans}}" range-key="name" value="{{planIndex}}" bindchange="onPlanFilter"><text>{{plans[planIndex].name || '全部计划'}} ▾</text></picker><button class="ghost-btn" bindtap="clearFilters">清除筛选</button></view></view>
     <view wx:if="{{footprints.length}}">
       <view wx:for="{{footprints}}" wx:key="id" class="footprint-card glass-card">
         <view class="footprint-date">{{item.dateLabel}}</view>
         <view class="footprint-main">
-          <image wx:if="{{item.photo}}" class="footprint-photo" mode="aspectFill" src="{{item.photo}}"></image>
-          <view class="footprint-copy"><view class="footprint-head"><text class="tag">{{item.domainName}}</text><text class="duration">{{item.durationLabel}}</text></view><text class="footprint-name">{{item.actionName}}</text><text wx:if="{{item.completionLabel}}" class="completion-label">{{item.completionLabel}}</text><text class="footprint-feeling">{{item.feelingLabel}}</text><text wx:if="{{item.note}}" class="footprint-note">“{{item.note}}”</text><text wx:if="{{item.location}}" class="footprint-location">⌖ {{item.location.name}}</text><text wx:if="{{item.planName}}" class="footprint-plan" data-id="{{item.planId}}" bindtap="openPlan">来自「{{item.planName}}」 ›</text></view>
+          <image wx:if="{{item.photo}}" class="footprint-photo" mode="aspectFill" src="{{item.photo}}" data-id="{{item.id}}" bindtap="previewPhoto"></image>
+          <view class="footprint-copy"><view class="footprint-head"><text class="tag">{{item.domainName}}</text><text class="duration">{{item.durationLabel}}</text></view><text class="footprint-name">{{item.actionName}}</text><text wx:if="{{item.completionLabel}}" class="completion-label">{{item.completionLabel}}</text><text class="footprint-feeling">{{item.feelingLabel}}</text><text wx:if="{{item.note}}" class="footprint-note">“{{item.note}}”</text><text wx:if="{{item.location}}" class="footprint-location">⌖ {{item.location.name}}</text><text wx:if="{{item.planAvailable}}" class="footprint-plan" data-id="{{item.planId}}" bindtap="openPlan">来自「{{item.planName}}」 ›</text></view>
         </view>
         <view class="footprint-actions"><text data-id="{{item.id}}" bindtap="editFootprint">编辑</text><text data-id="{{item.id}}" bindtap="deleteFootprint">删除</text></view>
       </view>
     </view>
-    <view wx:else class="empty glass-card">还没有足迹。<br/>不妨从“此刻”的一个小选择开始。</view>
+    <view wx:if="{{footprints.length < totalCount}}" class="load-more" bindtap="onReachBottom">加载更多（已显示 {{footprints.length}} / {{totalCount}}）</view>
+    <view wx:if="{{!footprints.length}}" class="empty glass-card">这里还没有匹配的足迹。<view>可以清除筛选，或补记一段生活。</view></view>
   </view>
 
   <view wx:else class="review-view">
@@ -24,12 +27,13 @@
     <view wx:if="{{period === 'custom'}}" class="date-range glass-card"><picker mode="date" value="{{startDate}}" bindchange="onStartDate"><text>{{startDate || '开始日期'}}</text></picker><text>—</text><picker mode="date" value="{{endDate}}" bindchange="onEndDate"><text>{{endDate || '结束日期'}}</text></picker></view>
 
     <view class="stats-hero glass-card">
-      <view><text class="stats-number">{{stats.count}}</text><text class="stats-label">次足迹</text></view><view class="stats-line"></view><view><text class="stats-duration">{{stats.totalDuration}}</text><text class="stats-label">和生活相处</text></view>
+      <view><text class="stats-number">{{stats.count}}</text><text class="stats-label">条记录</text></view><view class="stats-line"></view><view><text class="stats-duration">{{stats.totalDuration}}</text><text class="stats-label">已记录的时长</text></view>
     </view>
+    <view class="stats-explanation">实际参与 {{stats.participatedCount}} 次 · 最后没做 {{stats.notStartedCount}} 次<view wx:if="{{stats.unknownDurationCount}}">{{stats.unknownDurationCount}} 次未记录时长，不计作零分钟。</view></view>
     <view class="section" wx:if="{{stats.domains.length}}"><view class="section-title">时间去过哪里</view><view class="domain-stats solid-card"><view wx:for="{{stats.domains}}" wx:key="name" class="domain-stat"><view><text>{{item.name}}</text><text class="muted">{{item.count}} 次</text></view><text>{{item.duration}}</text></view></view></view>
     <view class="section"><view class="section-title">感受天气</view><view class="feeling-stats glass-card"><view><text>{{stats.feelings.love}}</text><text>很喜欢</text></view><view><text>{{stats.feelings.good}}</text><text>还不错</text></view><view><text>{{stats.feelings.okay}}</text><text>一般</text></view><view><text>{{stats.feelings.poor}}</text><text>不太喜欢</text></view></view></view>
     <view class="section"><view class="section-title">反复出现</view><view class="favorite solid-card">{{stats.favorite}}</view></view>
-    <button class="primary-btn review-btn" loading="{{reviewing}}" bindtap="generateReview">{{reviewing ? '正在回望…' : '生成这段时间的回顾'}}</button>
-    <view class="section" wx:if="{{reviews.length}}"><view class="section-title">保存的回顾</view><view wx:for="{{reviews}}" wx:key="id" class="saved-review glass-card"><text class="review-content">{{item.content}}</text><view class="review-foot"><text>{{item.period === 'week' ? '本周' : item.period === 'month' ? '本月' : item.period === 'year' ? '今年' : '自定义'}}</text><view><text data-id="{{item.id}}" bindtap="editReview">修改</text><text data-id="{{item.id}}" bindtap="deleteReview">删除</text></view></view></view></view>
+    <button class="primary-btn review-btn" loading="{{reviewing}}" disabled="{{reviewing || !stats.count}}" bindtap="generateReview">{{reviewing ? '正在回望…' : '生成这段时间的回顾'}}</button>
+    <view class="section" wx:if="{{reviews.length}}"><view class="section-title">保存的回顾</view><view wx:for="{{reviews}}" wx:key="id" class="saved-review glass-card"><text class="review-content">{{item.content}}</text><view class="review-foot"><view><text>{{item.rangeLabel}}</text><view>{{item.savedDate}} 保存 · {{item.source === "rule" ? "基础回顾" : "回顾"}}</view></view><view><text data-id="{{item.id}}" bindtap="editReview">修改</text><text data-id="{{item.id}}" bindtap="deleteReview">删除</text></view></view></view></view>
   </view>
 </view></view>

@@ -4,6 +4,7 @@
   <view class="action-title">{{action.name}}</view>
   <view class="action-meta"><text>{{action.duration}}</text><text wx:if="{{action.planName}}"> · 来自「{{action.planName}}」</text></view>
 
+  <picker wx:if="{{!session && plans.length > 1}}" mode="selector" range="{{plans}}" range-key="name" value="{{planIndex}}" bindchange="onPlan"><view class="plan-choice">本次归属：{{plans[planIndex].name}} ▾</view></picker>
   <view class="glass-card action-detail">
     <view class="detail-row"><text class="detail-label">为什么是它</text><text class="detail-value">{{action.reason || '现在开始，门槛刚刚好。'}}</text></view>
     <view class="divider"></view>
@@ -23,10 +24,10 @@
   </view>
 
   <view wx:else class="start-panel">
-    <view class="start-note">选择之后也不会自动计时</view>
+    <view class="start-note">提醒仅在此页或返回“此刻”时出现，不是后台闹钟。</view>
     <button class="primary-btn" bindtap="startTimer">开始计时</button>
-    <button class="secondary-btn" bindtap="startWithReminder">设置结束提醒并计时</button>
+    <button class="secondary-btn" bindtap="startWithReminder">计时，到时提示我</button>
     <button class="secondary-btn" bindtap="direct">直接去做</button>
-    <button class="ghost-btn" bindtap="later">稍后再说</button>
+    <button class="ghost-btn" bindtap="later">返回选择</button>
   </view>
 </view></view>

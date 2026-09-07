@@ -9,9 +9,9 @@
     <view class="field-label">所属板块</view><picker mode="selector" range="{{domains}}" range-key="name" value="{{domainIndex}}" bindchange="onDomain"><view class="picker-value"><text class="picker-text">{{domains[domainIndex].name}}</text><view class="picker-arrow"></view></view></picker>
     <view class="field-label">当前状态</view><view class="chips"><view wx:for="{{statuses}}" wx:key="value" class="chip {{plan.status === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="setStatus">{{item.label}}</view></view>
     <view class="focus-toggle" bindtap="toggleFocus"><view><text class="toggle-title">加入最近关注</text><text class="toggle-sub">最多关注三个计划，其行动优先显示在首页</text></view><view class="switch {{plan.focused ? 'on' : ''}}"><view></view></view></view>
-    <view class="field-label">重要日期（选填）</view><picker mode="date" value="{{plan.importantDate}}" bindchange="onDate"><view class="picker-value muted-value"><text class="picker-text">{{plan.importantDate || '选择日期'}}</text><view class="picker-arrow"></view></view></picker>
+    <view class="field-label">重要日期（选填）<text wx:if="{{plan.importantDate}}" class="clear-date" bindtap="clearDate">清除</text></view><picker mode="date" value="{{plan.importantDate}}" bindchange="onDate"><view class="picker-value muted-value"><text class="picker-text">{{plan.importantDate || '选择日期'}}</text><view class="picker-arrow"></view></view></picker>
   </view>
-  <button class="primary-btn save-plan" bindtap="save">保存计划</button>
+  <view class="save-hint">{{dirty || isNew ? "内容尚未保存；开始、添加或编辑行动时会一并保存计划。" : "计划已保存"}}</view>
 
   <view wx:if="{{!isNew}}" class="section">
     <view class="section-title">这段经历</view>
@@ -19,18 +19,20 @@
     <view class="plan-feelings"><text>感受</text><text>晴 {{stats.feelings.love}}</text><text>暖 {{stats.feelings.good}}</text><text>平 {{stats.feelings.okay}}</text><text>淡 {{stats.feelings.poor}}</text></view>
   </view>
 
-  <view wx:if="{{!isNew}}" class="section">
-    <view class="section-head"><view><text class="section-title">对应板块的行动库</text><text class="section-note">{{domainName}} · 已加入的排在前面</text></view><button class="ghost-btn" bindtap="addAction">＋ 新行动</button></view>
-    <view wx:if="{{actions.length}}" class="related-list solid-card"><view wx:for="{{actions}}" wx:key="id" class="related-row selectable {{item.linked ? 'linked' : ''}}" data-id="{{item.id}}" bindtap="toggleActionLink"><view><text>{{item.name}}</text><text>{{item.minutes}} 分钟<text wx:if="{{item.suitableNow}}" class="suitable"> · 适合此刻</text></text></view><view class="relation-actions"><text class="relation-state">{{item.linked ? '已加入' : '加入'}}</text><text data-id="{{item.id}}" catchtap="editAction">编辑</text></view></view></view>
+  <view class="section">
+    <view class="section-head"><view><text class="section-title">关联具体行动</text><text class="section-note">{{domainName}} · 已加入的排在前面</text></view><button class="ghost-btn" bindtap="addAction">＋ 新行动</button></view>
+    <view wx:if="{{actions.length}}" class="related-list solid-card"><view wx:for="{{actions}}" wx:key="id" class="related-row selectable {{item.linked ? 'linked' : ''}}" data-id="{{item.id}}" bindtap="toggleActionLink"><view><text>{{item.name}}</text><text>{{item.minutes}} 分钟<text wx:if="{{item.suitableNow}}" class="suitable"> · 适合此刻</text></text></view><view class="relation-actions"><text class="relation-state">{{item.linked ? '已加入' : '加入'}}</text><text data-id="{{item.id}}" catchtap="editAction">编辑</text><text wx:if="{{item.linked}}" data-id="{{item.id}}" catchtap="openAction">开始</text></view></view></view>
     <view wx:else class="empty glass-card">这个板块还没有行动。新建后会同时进入行动库。</view>
     <button class="secondary-btn ask-next" bindtap="askNext">请风月想几个下一步</button>
   </view>
 
   <view wx:if="{{!isNew}}" class="section">
-    <view class="section-head"><text class="section-title">最近足迹</text><text class="section-note">只展示最近五次</text></view>
+    <view class="section-head"><text class="section-title">最近足迹</text><button class="ghost-btn" bindtap="allFootprints">查看全部</button></view>
     <view wx:if="{{footprints.length}}" class="related-list solid-card"><view wx:for="{{footprints}}" wx:key="id" class="footprint-row"><view><text>{{item.actionName}}</text><text>{{item.dateLabel}} · {{item.durationLabel}}</text></view><text>{{item.feelingLabel}}</text></view></view>
     <view wx:else class="empty">还没有足迹。</view>
   </view>
 
   <view wx:if="{{!isNew}}" class="section reflection glass-card" bindtap="reflect"><text class="section-title">回头看看</text><text>{{plan.reflection || '写下最近的感受，不需要得出答案。'}}</text><text class="chevron">›</text></view>
+  <button wx:if="{{!isNew}}" class="danger-btn delete-plan" bindtap="deletePlan">删除计划</button>
+  <view class="save-dock"><button class="primary-btn" bindtap="save">{{isNew ? '保存计划，继续安排' : '保存计划'}}</button></view>
 </view></view>
