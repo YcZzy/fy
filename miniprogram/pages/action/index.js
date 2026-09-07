@@ -1,9 +1,17 @@
 const repository = require('../../services/repository')
 const format = require('../../services/format')
+const themeService = require('../../services/theme')
 
 Page({
-  data: { action: null, session: null, elapsed: '00:00', finished: false },
-  onLoad(options) { this.actionId = options.id; this.timer = null },
+  data: { action: null, session: null, elapsed: '00:00', finished: false, theme: 'now' },
+  onLoad(options) {
+    this.actionId = options.id
+    this.planId = options.planId || ''
+    this.timer = null
+    const theme = themeService.fromOptions(options)
+    this.setData({ theme })
+    themeService.apply(theme)
+  },
   onShow() { this.load() },
   onHide() { this.clearTicker() },
   onUnload() { this.clearTicker() },
@@ -13,9 +21,12 @@ Page({
     const raw = state.actions.find((item) => item.id === this.actionId) || cached.find((item) => item.id === this.actionId) || (state.activeSession && state.activeSession.actionId === this.actionId && state.activeSession.actionSnapshot) || (state.pendingAction && state.pendingAction.actionId === this.actionId && state.pendingAction.actionSnapshot)
     if (!raw) { wx.showToast({ title: '行动不存在', icon: 'none' }); setTimeout(() => wx.navigateBack(), 500); return }
     const domain = state.domains.find((item) => item.id === raw.domainId)
-    const plan = state.plans.find((item) => item.id === raw.planId)
+    const sessionSnapshot = state.activeSession && state.activeSession.actionId === raw.id && state.activeSession.actionSnapshot
+    const pendingSnapshot = state.pendingAction && state.pendingAction.actionId === raw.id && state.pendingAction.actionSnapshot
+    const planId = (sessionSnapshot && sessionSnapshot.planId) || (pendingSnapshot && pendingSnapshot.planId) || this.planId || raw.planId || ''
+    const plan = state.plans.find((item) => item.id === planId)
     const domainName = raw.domainName || (domain && domain.name) || '生活'
-    const action = { ...raw, domainName, domainInitial: domainName.slice(0, 1), planName: raw.planName || (plan && plan.name) || '', duration: format.duration(raw.minutes) }
+    const action = { ...raw, planId, domainName, domainInitial: domainName.slice(0, 1), planName: raw.planName || (plan && plan.name) || '', duration: format.duration(raw.minutes) }
     const session = state.activeSession && state.activeSession.actionId === raw.id ? state.activeSession : null
     this.setData({ action, session })
     this.startTicker()
@@ -23,7 +34,7 @@ Page({
   startTimer() {
     const state = repository.getState()
     if (state.activeSession && state.activeSession.actionId !== this.data.action.id) {
-      wx.showModal({ title: '还有一件事正在计时', content: `先处理“${state.activeSession.actionName}”，再开始新的行动。`, confirmText: '去看看', success: (res) => { if (res.confirm) wx.redirectTo({ url: `/pages/action/index?id=${state.activeSession.actionId}` }) } })
+      wx.showModal({ title: '还有一件事正在计时', content: `先处理“${state.activeSession.actionName}”，再开始新的行动。`, confirmText: '去看看', success: (res) => { if (res.confirm) wx.redirectTo({ url: this.sessionUrl(state.activeSession) }) } })
       return
     }
     repository.startSession(this.data.action, 'timer')
@@ -39,7 +50,7 @@ Page({
   direct() {
     const state = repository.getState()
     if (state.activeSession && state.activeSession.actionId !== this.data.action.id) {
-      wx.showModal({ title: '还有一件事正在计时', content: `先处理“${state.activeSession.actionName}”，再开始新的行动。`, confirmText: '去看看', success: (res) => { if (res.confirm) wx.redirectTo({ url: `/pages/action/index?id=${state.activeSession.actionId}` }) } })
+      wx.showModal({ title: '还有一件事正在计时', content: `先处理“${state.activeSession.actionName}”，再开始新的行动。`, confirmText: '去看看', success: (res) => { if (res.confirm) wx.redirectTo({ url: this.sessionUrl(state.activeSession) }) } })
       return
     }
     repository.startSession(this.data.action, 'direct')
@@ -48,7 +59,7 @@ Page({
   },
   pause() { repository.pauseSession(); this.load() },
   resume() { repository.resumeSession(); this.load() },
-  finish() { wx.navigateTo({ url: `/pages/record/index?actionId=${this.data.action.id}&mode=timer` }) },
+  finish() { wx.navigateTo({ url: themeService.withTheme(`/pages/record/index?actionId=${this.data.action.id}&mode=timer${this.data.action.planId ? `&planId=${this.data.action.planId}` : ''}`, this.data.theme) }) },
   cancel() {
     wx.showModal({ title: '结束这次计时？', content: '可以直接结束，不会留下失败记录。', confirmText: '结束', confirmColor: '#A85F50', success: (res) => { if (res.confirm) { repository.clearSession(); this.load() } } })
   },
@@ -68,8 +79,12 @@ Page({
     }
     tick(); this.timer = setInterval(tick, 1000)
   },
-  clearTicker() { if (this.timer) clearInterval(this.timer); this.timer = null }
-  ,promptReminder() {
+  clearTicker() { if (this.timer) clearInterval(this.timer); this.timer = null },
+  sessionUrl(session) {
+    const planId = (session.actionSnapshot && session.actionSnapshot.planId) || ''
+    return themeService.withTheme(`/pages/action/index?id=${session.actionId}${planId ? `&planId=${planId}` : ''}`, this.data.theme)
+  },
+  promptReminder() {
     repository.update((state) => { if (state.activeSession) state.activeSession.reminderPrompted = true })
     wx.showActionSheet({ alertText: '预计时间到了，想怎么继续？', itemList: ['结束并记录', '继续 15 分钟', '不再提醒'], success: (res) => {
       if (res.tapIndex === 0) this.finish()

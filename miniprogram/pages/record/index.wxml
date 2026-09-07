@@ -1,4 +1,4 @@
-<view class="page record-page"><view class="page-content" wx:if="{{action}}">
+<view class="page record-page context-page theme-{{theme}}"><view class="page-content" wx:if="{{action}}">
   <text class="eyebrow">刚刚的生活</text>
   <view class="hero-title">{{action.name}}</view>
   <view class="hero-subtitle">记多少都可以，也可以轻轻跳过。</view>

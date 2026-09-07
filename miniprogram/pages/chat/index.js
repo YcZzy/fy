@@ -1,16 +1,19 @@
 const repository = require('../../services/repository')
 const ai = require('../../services/ai')
 const format = require('../../services/format')
+const themeService = require('../../services/theme')
 
 const QUICK = ['此刻做什么', '展开一个想法', '帮我建个计划', '回顾最近生活', '想点周末去处', '随便聊聊']
 
 Page({
-  data: { messages: [], input: '', quick: QUICK, history: [], sending: false, draft: null, scrollInto: '' },
+  data: { messages: [], input: '', quick: QUICK, history: [], sending: false, draft: null, scrollInto: '', theme: 'now' },
   onLoad(options) {
+    const theme = themeService.fromOptions(options)
+    themeService.apply(theme)
     this.planId = options.planId || ''
     const state = repository.getState()
     this.conversation = { id: format.uid('c'), title: '一段新对话', messages: [], createdAt: Date.now(), updatedAt: Date.now() }
-    this.setData({ history: state.conversations.slice(0, 6) })
+    this.setData({ history: state.conversations.slice(0, 6), theme })
     if (options.prompt) this.setData({ input: decodeURIComponent(options.prompt) }, () => this.send())
   },
   onInput(event) { this.setData({ input: event.detail.value }) },
@@ -25,14 +28,15 @@ Page({
       const state = repository.getState()
       const contextSummary = {
         domains: state.domains.filter((item) => !item.hidden).map(({ id, name }) => ({ id, name })),
-        focusedPlans: state.plans.filter((item) => item.focused).map(({ id, name }) => ({ id, name })),
+        focusedPlans: state.plans.filter((item) => item.focused && item.status !== 'ended').map(({ id, name }) => ({ id, name })),
         plans: state.plans.filter((item) => item.status !== 'ended').slice(0, 20).map(({ id, name, domainId }) => ({ id, name, domainId })),
         wishes: state.wishes.slice(0, 8).map((item) => item.text),
         recentFootprints: state.footprints.slice(0, 8).map(({ actionName, minutes, feelingLabel }) => ({ actionName, minutes, feelingLabel }))
       }
       const result = await ai.chat(messages, contextSummary)
       const assistant = { id: format.uid('m'), role: 'assistant', content: result.reply || '这一刻可以先不急着回答。', createdAt: Date.now() }
-      const draft = result.draft && result.draft.type === 'action' && this.planId ? { ...result.draft, planId: this.planId } : result.draft
+      const plan = this.planId ? state.plans.find((item) => item.id === this.planId) : null
+      const draft = result.draft && result.draft.type === 'action' && plan ? { ...result.draft, planId: plan.id, domainId: plan.domainId } : result.draft
       this.finishMessage([...messages, assistant], draft || null)
     } catch (error) {
       console.warn('AI 对话不可用', error)
@@ -64,11 +68,11 @@ Page({
     if (!draft) return
     if (draft.type === 'plan') {
       this.setData({ draft: null })
-      wx.navigateTo({ url: `/pages/plan/index?draft=${encodeURIComponent(JSON.stringify(draft))}` })
+      wx.navigateTo({ url: themeService.withTheme(`/pages/plan/index?draft=${encodeURIComponent(JSON.stringify(draft))}`, this.data.theme) })
       return
     }
     this.setData({ draft: null })
-    wx.navigateTo({ url: `/pages/action-editor/index?draft=${encodeURIComponent(JSON.stringify(draft))}` })
+    wx.navigateTo({ url: themeService.withTheme(`/pages/action-editor/index?draft=${encodeURIComponent(JSON.stringify(draft))}`, this.data.theme) })
   },
   discardDraft() { this.setData({ draft: null }) },
   messageMenu(event) {

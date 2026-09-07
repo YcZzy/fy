@@ -41,11 +41,17 @@ async function removeOwned(collection, openid) {
   }
 }
 
+function fileDeleteSucceeded(item) {
+  if (!item) return false
+  const status = Number(item.status)
+  return item.code === 'SUCCESS' || status === 0 || status === -503003
+}
+
 async function removeFiles(fileList) {
   const failed = []
   for (let index = 0; index < fileList.length; index += 50) {
     const result = await cloud.deleteFile({ fileList: fileList.slice(index, index + 50) })
-    failed.push(...(result.fileList || []).filter((item) => Number(item.status) !== 0))
+    failed.push(...(result.fileList || []).filter((item) => !fileDeleteSucceeded(item)))
   }
   if (failed.length) {
     const error = new Error('FILE_DELETE_INCOMPLETE')
@@ -54,8 +60,11 @@ async function removeFiles(fileList) {
   }
 }
 
-async function loadOwnedData(openid) {
-  const results = await Promise.all(SYNC_COLLECTIONS.map(async (name) => {
+async function loadOwnedData(openid, requestedCollections) {
+  const requested = Array.isArray(requestedCollections) && requestedCollections.length
+    ? [...new Set(requestedCollections)].filter((name) => SYNC_COLLECTIONS.includes(name))
+    : SYNC_COLLECTIONS
+  const results = await Promise.all(requested.map(async (name) => {
     try { return { name, documents: await getAllOwned(name, openid) } }
     catch (error) {
       return { name, documents: [], error: error && error.message ? error.message : String(error) }
@@ -73,7 +82,7 @@ exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
   if (!OPENID) throw new Error('UNAUTHENTICATED')
   if (event.action === 'initialize' && event.confirm === 'CREATE_COLLECTIONS') return initializeCollections()
-  if (event.action === 'load') return loadOwnedData(OPENID)
+  if (event.action === 'load') return loadOwnedData(OPENID, event.collections)
   if (event.action !== 'deleteAll' || event.confirm !== 'DELETE_MY_DATA') throw new Error('INVALID_CONFIRMATION')
 
   const failures = []
@@ -84,13 +93,15 @@ exports.main = async (event) => {
     footprintsReadable = false
     failures.push({ target: 'footprints_read', message: error && error.message ? error.message : String(error) })
   }
-  const fileList = footprints.reduce((all, item) => all.concat(item.photoFileIds || []), [])
+  const fileList = [...new Set(footprints
+    .reduce((all, item) => all.concat(Array.isArray(item.photoFileIds) ? item.photoFileIds : []), [])
+    .filter((fileId) => typeof fileId === 'string' && fileId.trim()))]
   let filesDeleted = true
   if (fileList.length) {
     try { await removeFiles(fileList) }
     catch (error) {
       filesDeleted = false
-      failures.push({ target: 'files', message: error && error.message ? error.message : String(error) })
+      failures.push({ target: 'files', message: error && error.message ? error.message : String(error), details: error && error.details ? error.details : [] })
     }
   }
   // 只有确认照片已处理后才删除足迹文档，失败时保留文件 ID 以便下次重试。

@@ -1,6 +1,20 @@
+.footprints-page {
+  --tab-theme: #789785;
+  --tab-theme-deep: #587763;
+  --tab-theme-soft: #e2ebe5;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 150rpx);
+  background: linear-gradient(180deg, #eef3ef 0, #f1f2ed 390rpx, #f4efe7 760rpx);
+}
+.footprints-page::before { background: rgba(120, 151, 133, .20); }
+.footprints-page::after { background: rgba(167, 190, 174, .14); }
+.footprints-page .eyebrow, .footprints-page .footprint-date, .footprints-page .completion-label, .footprints-page .footprint-plan { color: var(--tab-theme-deep); }
+.footprints-page .chip.active { background: var(--tab-theme); border-color: var(--tab-theme); box-shadow: 0 8rpx 20rpx rgba(88, 119, 99, .15); }
+.footprints-page .tag { color: var(--tab-theme-deep); background: rgba(120, 151, 133, .11); }
+.footprints-page .primary-btn { background: linear-gradient(135deg, #91ad9c, var(--tab-theme)); box-shadow: 0 16rpx 34rpx rgba(88, 119, 99, .20); }
+
 .view-tabs { display: flex; margin-top: 36rpx; padding: 6rpx; border-radius: 999rpx; background: rgba(234,225,213,.65); }
 .view-tab { flex: 1; padding: 17rpx; text-align: center; border-radius: 999rpx; color: var(--muted); font-size: 25rpx; }
-.view-tab.active { color: var(--ink); background: #fffaf3; box-shadow: 0 6rpx 18rpx rgba(90,72,55,.09); font-weight: 600; }
+.view-tab.active { color: var(--tab-theme-deep); background: var(--tab-theme-soft); box-shadow: 0 6rpx 18rpx rgba(88,119,99,.10); font-weight: 600; }
 .timeline, .review-view { margin-top: 28rpx; }
 .footprint-card { margin-bottom: 20rpx; padding: 25rpx; }
 .footprint-date { color: var(--caramel-deep); font-size: 22rpx; letter-spacing: 2rpx; }

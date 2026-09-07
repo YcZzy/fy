@@ -95,3 +95,104 @@ button::after { border: 0; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass-card { background: #fffaf3; }
 }
+
+/* 跳转页沿用入口 tab 的主题，避免从列表进入详情时出现色彩断层。 */
+.context-page.theme-now {
+  --theme-accent: #c47d60;
+  --theme-accent-light: #cf9478;
+  --theme-deep: #9f6048;
+  --theme-soft: #f1dfd5;
+  --theme-surface: rgba(255, 250, 247, .80);
+  --theme-surface-solid: #fff8f4;
+  --theme-shadow: rgba(159, 96, 72, .20);
+  --theme-background: linear-gradient(180deg, #f7f0ea 0, #f4efe8 390rpx, #f4efe7 800rpx);
+  --theme-glow-top: rgba(214, 154, 123, .20);
+  --theme-glow-bottom: rgba(231, 190, 163, .13);
+}
+
+.context-page.theme-moon {
+  --theme-accent: #7595a5;
+  --theme-accent-light: #91acb9;
+  --theme-deep: #567789;
+  --theme-soft: #e2ecef;
+  --theme-surface: rgba(248, 252, 253, .80);
+  --theme-surface-solid: #f8fcfd;
+  --theme-shadow: rgba(86, 119, 137, .20);
+  --theme-background: linear-gradient(180deg, #edf3f4 0, #f1f2ef 390rpx, #f4efe7 800rpx);
+  --theme-glow-top: rgba(117, 149, 165, .20);
+  --theme-glow-bottom: rgba(159, 185, 193, .12);
+}
+
+.context-page.theme-footprints {
+  --theme-accent: #789785;
+  --theme-accent-light: #91ad9c;
+  --theme-deep: #587763;
+  --theme-soft: #e2ebe5;
+  --theme-surface: rgba(249, 252, 249, .80);
+  --theme-surface-solid: #f9fcf9;
+  --theme-shadow: rgba(88, 119, 99, .20);
+  --theme-background: linear-gradient(180deg, #eef3ef 0, #f1f2ed 390rpx, #f4efe7 800rpx);
+  --theme-glow-top: rgba(120, 151, 133, .20);
+  --theme-glow-bottom: rgba(167, 190, 174, .14);
+}
+
+.context-page.page,
+.context-page.chat-page { background: var(--theme-background); }
+.context-page.page::before { background: var(--theme-glow-top); }
+.context-page.page::after { background: var(--theme-glow-bottom); }
+.context-page .glass-card { background: var(--theme-surface); }
+.context-page .solid-card { background: var(--theme-surface-solid); }
+
+.context-page .eyebrow,
+.context-page .ghost-btn,
+.context-page .detail-label,
+.context-page .draft-eyebrow,
+.context-page .attachment-icon,
+.context-page .suitable { color: var(--theme-deep); }
+
+.context-page .primary-btn {
+  background: linear-gradient(135deg, var(--theme-accent-light), var(--theme-accent));
+  box-shadow: 0 16rpx 34rpx var(--theme-shadow);
+}
+
+.context-page .chip.active {
+  color: #fff;
+  border-color: var(--theme-accent);
+  background: var(--theme-accent);
+  box-shadow: 0 8rpx 20rpx var(--theme-shadow);
+}
+
+.context-page .tag,
+.context-page .feeling-symbol {
+  color: var(--theme-deep);
+  background: var(--theme-soft);
+}
+
+.context-page .switch.on,
+.context-page .again.active,
+.context-page .status.ready { background: var(--theme-accent); }
+
+.context-page .action-orbit-inner,
+.context-page .wind-mark {
+  background: linear-gradient(145deg, var(--theme-accent-light), var(--theme-deep));
+  box-shadow: 0 18rpx 40rpx var(--theme-shadow);
+}
+
+.context-page .send-btn,
+.context-page .typing text { background: var(--theme-accent); }
+
+.context-page .composer {
+  border-top-color: var(--theme-soft);
+  background: var(--theme-surface);
+}
+
+.context-page .feeling.active {
+  color: #fff;
+  border-color: var(--theme-accent);
+  background: var(--theme-deep);
+}
+
+.context-page .feeling.active .feeling-symbol {
+  color: var(--theme-deep);
+  background: var(--theme-soft);
+}

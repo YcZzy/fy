@@ -19,11 +19,12 @@ function contextKey(context) {
 
 function withPresentation(action, state, reason) {
   const domain = state.domains.find((item) => item.id === action.domainId)
-  const plan = state.plans.find((item) => item.id === action.planId)
+  const plan = state.plans.find((item) => item.id === action.planId) || state.plans.find((item) => item.focused && item.status !== 'ended' && (item.actionIds || []).includes(action.id)) || state.plans.find((item) => (item.actionIds || []).includes(action.id))
   return {
     ...action,
     domainName: domain ? domain.name : '生活',
     domainColor: domain ? domain.color : '#75806B',
+    planId: plan ? plan.id : (action.planId || ''),
     planName: plan ? plan.name : '',
     reason: reason || '它与此刻的时间和状态刚好合拍。',
     locationNote: action.environments.includes('location') ? '仅提供活动类别，请自行确认具体地点与营业信息。' : ''
@@ -75,8 +76,8 @@ function recentPenalty(action, state) {
 
 function score(action, state, context) {
   let value = 100 - Math.abs(context.minutes - action.minutes) * 0.35
-  const plan = state.plans.find((item) => item.id === action.planId)
-  if (plan && plan.focused) value += 26
+  const focused = state.plans.some((item) => item.focused && item.status !== 'ended' && (item.actionIds || []).includes(action.id))
+  if (focused) value += 26
   if (action.minutes <= 15) value += 8
   if (context.energy === 'low' && action.energy.includes('low')) value += 10
   const selectedDomains = new Set((state.preferences.selectedInterests || []).map((item) => INTEREST_DOMAINS[item]).filter(Boolean))
@@ -104,7 +105,7 @@ function recommend(state, context) {
   if (intents.include.length) {
     candidates.filter((item) => intents.include.includes(item.domainId)).slice(0, 5).forEach((item) => add(pick(candidates, used, (x) => x.id === item.id), '你刚才说的，更像是想把时间交给这件事。'))
   } else {
-    add(pick(candidates, used, (item) => state.plans.some((plan) => plan.focused && plan.id === item.planId)), '从最近惦记的事情里，轻轻往前走一步。')
+    add(pick(candidates, used, (item) => state.plans.some((plan) => plan.focused && plan.status !== 'ended' && (plan.actionIds || []).includes(item.id))), '从最近关注的计划里，轻轻往前走一步。')
     add(pick(candidates, used, (item) => item.minutes <= 15 || DOMAIN_GROUPS.light.includes(item.domainId)), '门槛不高，现在开始也来得及。')
     add(pick(candidates, used, (item) => DOMAIN_GROUPS.body.includes(item.domainId)), '让身体和眼睛换一换此刻的风景。')
     add(pick(candidates, used, (item) => DOMAIN_GROUPS.focus.includes(item.domainId)), '也许可以把一点时间交给好奇心。')
@@ -116,23 +117,27 @@ function recommend(state, context) {
 
 function normalizeAiRecommendations(rawItems, state, context) {
   if (!Array.isArray(rawItems)) return []
-  const planIds = new Set(state.plans.map((item) => item.id))
+  const plansById = new Map(state.plans.map((item) => [item.id, item]))
   const domainIds = new Set(state.domains.map((item) => item.id))
   const intents = intentDomains(context.note)
   return rawItems.filter((item) => item && typeof item.name === 'string' && item.name.trim().length >= 3)
-    .map((item) => ({
-      id: uid('ai_action'),
-      name: item.name.trim().slice(0, 30),
-      domainId: domainIds.has(item.domainId) ? item.domainId : 'daily',
-      minutes: Math.max(5, Math.min(context.minutes, Number(item.minutes) || context.minutes)),
-      energy: [context.energy],
-      environments: [['location', 'manual'].includes(context.environment) ? 'location' : context.environment],
-      preparation: String(item.preparation || '不需要额外准备').slice(0, 50),
-      planId: planIds.has(item.planId) ? item.planId : '',
-      source: 'ai',
-      reason: String(item.reason || '它与此刻的状态刚好合拍。').slice(0, 70),
-      locationNote: String(item.locationNote || '').slice(0, 70)
-    }))
+    .map((item) => {
+      const domainId = domainIds.has(item.domainId) ? item.domainId : 'daily'
+      const plan = plansById.get(item.planId)
+      return {
+        id: uid('ai_action'),
+        name: item.name.trim().slice(0, 30),
+        domainId,
+        minutes: Math.max(5, Math.min(context.minutes, Number(item.minutes) || context.minutes)),
+        energy: [context.energy],
+        environments: [['location', 'manual'].includes(context.environment) ? 'location' : context.environment],
+        preparation: String(item.preparation || '不需要额外准备').slice(0, 50),
+        planId: plan && plan.status !== 'ended' && plan.domainId === domainId ? plan.id : '',
+        source: 'ai',
+        reason: String(item.reason || '它与此刻的状态刚好合拍。').slice(0, 70),
+        locationNote: String(item.locationNote || '').slice(0, 70)
+      }
+    })
     .filter((item) => item.minutes <= context.minutes && !intents.exclude.includes(item.domainId))
     .slice(0, 5)
     .map((item) => withPresentation(item, state, item.reason))

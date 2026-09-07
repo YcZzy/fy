@@ -1,4 +1,4 @@
-<view class="page settings-page"><view class="page-content">
+<view class="page settings-page context-page theme-{{theme}}"><view class="page-content">
   <text class="eyebrow">你的数据，只属于你</text>
   <view class="hero-title">设置与隐私</view>
   <view class="hero-subtitle">位置按需申请；AI 只接收完成当前任务所需的生活摘要。</view>

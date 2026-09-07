@@ -1,6 +1,7 @@
 const repository = require('../../services/repository')
 const cloud = require('../../services/cloud')
 const format = require('../../services/format')
+const themeService = require('../../services/theme')
 
 const FEELINGS = [
   { value: 'love', label: '很喜欢', symbol: '晴' },
@@ -12,16 +13,24 @@ const DURATIONS = [{ label: '10 分钟', value: 10 }, { label: '半小时', valu
 const COMPLETIONS = [{ value: 'done', label: '做完了' }, { value: 'partial', label: '做了一部分' }, { value: 'not_started', label: '最后没做' }]
 
 Page({
-  data: { action: null, feelings: FEELINGS, durations: DURATIONS, completions: COMPLETIONS, completion: 'done', minutes: 30, customMinutes: '', feeling: '', note: '', again: '', photoPath: '', location: null, saving: false },
+  data: { action: null, feelings: FEELINGS, durations: DURATIONS, completions: COMPLETIONS, completion: 'done', minutes: 30, customMinutes: '', feeling: '', note: '', again: '', photoPath: '', location: null, saving: false, theme: 'now' },
   onLoad(options) {
+    const theme = themeService.fromOptions(options)
+    this.setData({ theme })
+    themeService.apply(theme)
     this.actionId = options.actionId
+    this.planId = options.planId || ''
     this.footprintId = options.footprintId || ''
     this.mode = options.mode || 'manual'
     const state = repository.getState()
     const existing = this.footprintId ? state.footprints.find((item) => item.id === this.footprintId) : null
     const cached = state.recommendationCache && state.recommendationCache.items || []
-    const action = state.actions.find((item) => item.id === this.actionId) || cached.find((item) => item.id === this.actionId) || (state.activeSession && state.activeSession.actionId === this.actionId && state.activeSession.actionSnapshot) || (state.pendingAction && state.pendingAction.actionId === this.actionId && state.pendingAction.actionSnapshot) || (existing && { id: existing.actionId, name: existing.actionName, domainId: existing.domainId, planId: existing.planId, minutes: existing.minutes || 30 })
-    if (!action) { wx.navigateBack(); return }
+    const rawAction = state.actions.find((item) => item.id === this.actionId) || cached.find((item) => item.id === this.actionId) || (state.activeSession && state.activeSession.actionId === this.actionId && state.activeSession.actionSnapshot) || (state.pendingAction && state.pendingAction.actionId === this.actionId && state.pendingAction.actionSnapshot) || (existing && { id: existing.actionId, name: existing.actionName, domainId: existing.domainId, planId: existing.planId, minutes: existing.minutes || 30 })
+    if (!rawAction) { wx.navigateBack(); return }
+    const sessionSnapshot = state.activeSession && state.activeSession.actionId === this.actionId && state.activeSession.actionSnapshot
+    const pendingSnapshot = state.pendingAction && state.pendingAction.actionId === this.actionId && state.pendingAction.actionSnapshot
+    const planId = this.planId || (existing && existing.planId) || (sessionSnapshot && sessionSnapshot.planId) || (pendingSnapshot && pendingSnapshot.planId) || rawAction.planId || ''
+    const action = { ...rawAction, planId }
     let minutes = action.minutes
     if (this.mode === 'timer' && state.activeSession) {
       const seconds = state.activeSession.status === 'paused' ? state.activeSession.elapsedBeforePause : (Date.now() - state.activeSession.startedAt) / 1000

@@ -1,0 +1,30 @@
+<view class="tab-bar-wrap">
+  <view class="tab-bar">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="pagePath"
+      class="tab-item {{item.tone}} {{selected === index ? 'active' : ''}}"
+      data-index="{{index}}"
+      bindtap="switchTab"
+      hover-class="tab-item-hover"
+      aria-role="tab"
+      aria-label="{{item.text}}{{selected === index ? '，已选中' : ''}}"
+    >
+      <view class="tab-mark">
+        <image
+          class="tab-icon tab-icon-rest"
+          src="{{item.icon}}"
+          mode="aspectFit"
+          aria-hidden="true"
+        />
+        <image
+          class="tab-icon tab-icon-active"
+          src="{{item.activeIcon}}"
+          mode="aspectFit"
+          aria-hidden="true"
+        />
+      </view>
+      <text>{{item.text}}</text>
+    </view>
+  </view>
+</view>

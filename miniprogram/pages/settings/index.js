@@ -1,9 +1,15 @@
 const repository = require('../../services/repository')
 const cloud = require('../../services/cloud')
 const env = require('../../config/env')
+const themeService = require('../../services/theme')
 
 Page({
-  data: { cloudReady: false, envLabel: '本地模式', counts: {} },
+  data: { cloudReady: false, envLabel: '本地模式', counts: {}, theme: 'now' },
+  onLoad(options) {
+    const theme = themeService.fromOptions(options)
+    this.setData({ theme })
+    themeService.apply(theme)
+  },
   onShow() {
     const state = repository.getState()
     const app = getApp()

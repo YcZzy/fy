@@ -5,7 +5,9 @@
       <view class="hero-title">{{greeting}}</view>
       <view class="hero-subtitle">这一段空闲，想交给什么？</view>
     </view>
-    <view class="settings" bindtap="openSettings">···</view>
+    <view class="settings" bindtap="openSettings" hover-class="settings-hover" aria-role="button" aria-label="设置">
+      <image class="settings-icon" src="/assets/settings.svg" mode="aspectFit" aria-hidden="true" />
+    </view>
   </view>
 
   <view wx:if="{{activeSession}}" class="active-card glass-card" bindtap="openActive">
@@ -13,16 +15,16 @@
     <view class="active-main"><text class="active-name">{{activeSession.actionName}}</text><text class="active-time">{{activeElapsed}}</text></view>
   </view>
 
-  <view class="section" wx:if="{{focusedPlans.length}}">
-    <view class="section-head"><text class="section-title">近来惦记</text><text class="section-note">最多三件，不必都做</text></view>
+  <view class="section" wx:if="{{continueActions.length}}">
+    <view class="section-head"><text class="section-title">继续一下</text><text class="section-note">最近关注计划里的行动</text></view>
     <scroll-view scroll-x class="focus-scroll" enhanced show-scrollbar="{{false}}">
       <view class="focus-row">
-        <view wx:for="{{focusedPlans}}" wx:key="id" class="focus-card glass-card">
-          <view class="focus-top"><text class="tag">最近关注</text><text class="focus-count">{{item.count}} 次</text></view>
+        <view wx:for="{{continueActions}}" wx:key="id" class="focus-card" data-id="{{item.id}}" data-plan-id="{{item.planId}}" bindtap="continueAction">
+          <view class="focus-top"><text class="tag">{{item.domainName}}</text><text class="focus-count">{{item.duration}}</text></view>
           <view class="focus-name">{{item.name}}</view>
-          <view class="focus-last">最近：{{item.lastAction}}</view>
-          <view class="focus-meta">{{item.duration}} · {{item.lastFeeling}}</view>
-          <button class="small-action" data-id="{{item.id}}" bindtap="continuePlan">继续一下 <text>→</text></button>
+          <view class="focus-last">来自「{{item.planName}}」</view>
+          <view class="focus-meta">{{item.suitableNow ? '适合现在的状态' : '也可以留到合适的时候'}}</view>
+          <view class="small-action" hover-class="small-action-hover" aria-role="button" aria-label="开始这个行动">开始这个行动 <text>→</text></view>
         </view>
       </view>
     </scroll-view>
@@ -55,8 +57,8 @@
         <view wx:if="{{item.locationNote}}" class="location-note">{{item.locationNote}}</view>
         <view class="recommend-actions">
           <button class="do-btn" data-id="{{item.id}}" bindtap="chooseAction">就做这个</button>
-          <button class="text-btn" data-id="{{item.id}}" bindtap="similarAction">换个类似的</button>
-          <button class="text-btn" data-id="{{item.id}}" bindtap="declineAction">暂时不想做</button>
+          <view class="text-btn" data-id="{{item.id}}" bindtap="similarAction" hover-class="text-btn-hover" aria-role="button" aria-label="换个类似的">换个类似的</view>
+          <view class="text-btn" data-id="{{item.id}}" bindtap="declineAction" hover-class="text-btn-hover" aria-role="button" aria-label="暂时不想做">暂时不想做</view>
         </view>
       </view>
     </view>

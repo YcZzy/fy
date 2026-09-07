@@ -15,7 +15,7 @@
 - 足迹完成状态、时长、感受、文字、照片、位置、编辑与删除；
 - 周、月、年和自定义回望，AI 失败时生成无评价的基础回顾；
 - “问风月”对话历史，AI 行动/计划草稿必须点击确认后才保存；
-- 本地优先存储、可选云同步、私有照片和全部个人数据删除。
+- 本地优先存储、持久化待同步队列、本地/云端按记录合并、跨设备删除标记、私有照片和全部个人数据删除。
 
 ## 直接运行
 
@@ -27,7 +27,7 @@
 
 1. 在 `miniprogram/config/env.js` 填入 `CLOUD_ENV_ID`。
 2. 在控制台的 AI → 生文模型中开启 `hy3`。小程序基础库要求 3.15.1 或更高。
-3. 部署 `dataManager` 后，首次启动会自动创建 `cloudbase/collections.json` 中缺失的集合。
+3. 根据 `cloudbase/collections.json` 创建所需集合，并部署 `dataManager`（仅用于完整个人数据删除等管理操作）。
 4. 创建集合不会自动应用权限文件；发布前必须通过部署流程或控制台，将 `cloudbase/database-rule.json` 应用到每个集合，并将 `cloudbase/storage-rule.json` 应用到云存储。
 5. 当前项目已开启 `ENABLE_CLOUD_SYNC`；部署 `dataManager` 云函数后可执行完整个人数据删除。
 
@@ -51,3 +51,15 @@ npm run check
 ```
 
 静态检查验证页面文件、JSON 与 JavaScript 语法。真机位置授权、私有照片读取、`hy3` 生成质量及云同步仍需在配置实际 AppID 和环境 ID 后验证。
+
+## GitHub 自动上传体验版
+
+推送到 `main` 分支后，GitHub Actions 会先运行完整检查，再使用 `miniprogram-ci` 上传微信小程序。首次运行版本号为 `1.0.0`，后续按工作流运行次数递增补丁版本（`1.0.1`、`1.0.2`……）；也可以在 Actions 页面手动触发。
+
+首次启用前需要完成一次配置：
+
+1. 在微信公众平台的“小程序代码上传”设置中生成 AppID `wx1574de4c1ef4b06a` 的上传密钥。
+2. 在 GitHub 仓库的 `Settings → Secrets and variables → Actions` 中新增 Repository secret：`WECHAT_MINIPROGRAM_PRIVATE_KEY`，值为上传密钥文件的完整内容。
+3. 如果微信公众平台启用了上传 IP 白名单，需确保 GitHub Actions Runner 的出口 IP 可以访问。
+
+上传密钥只保存在 GitHub Secret 中，不能提交到仓库；项目已忽略 `private.*.key` 文件。

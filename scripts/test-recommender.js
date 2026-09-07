@@ -18,4 +18,13 @@ if (recommender.isEligible(state.actions.find((item) => item.id === 'a_song'), s
 const aiItems = Array.from({ length: 5 }, (_, index) => ({ name: `学习行动${index}`, domainId: 'learn', minutes: 10 }))
 if (recommender.normalizeAiRecommendations(aiItems, state, context).length) throw new Error('AI 结果也必须服从否定意图')
 
-console.log('推荐回归通过：否定意图、娱乐选择和临时拒绝均按预期处理。')
+const mismatched = recommender.normalizeAiRecommendations([{ name: '收拾桌面十分钟', domainId: 'daily', minutes: 10, planId: 'p_english' }], state, { minutes: 30, energy: 'medium', environment: 'home', locationSummary: '', note: '' })
+if (mismatched[0] && mismatched[0].planId) throw new Error('AI 行动不能关联到不同板块的计划')
+
+const endedState = createInitialState()
+endedState.plans = [{ id: 'p_ended', name: '已经结束的体验', domainId: 'daily', status: 'ended', focused: true, actionIds: ['a_ended'] }]
+endedState.actions = [{ id: 'a_ended', name: '旧计划行动', domainId: 'daily', minutes: 10, energy: ['medium'], environments: ['home'] }]
+const endedRecommendations = recommender.recommend(endedState, { minutes: 30, energy: 'medium', environment: 'home', locationSummary: '', note: '' })
+if (endedRecommendations.some((item) => item.reason === '从最近关注的计划里，轻轻往前走一步。')) throw new Error('已结束计划不应继续获得关注推荐')
+
+console.log('推荐回归通过：否定意图、娱乐选择、临时拒绝及已结束计划过滤均按预期处理。')

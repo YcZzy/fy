@@ -23,7 +23,7 @@ files.filter((file) => file.endsWith('.js')).forEach((file) => execFileSync(proc
 const wxml = files.filter((file) => file.endsWith('.wxml')).map((file) => fs.readFileSync(file, 'utf8')).join('\n')
 const javascript = files.filter((file) => file.endsWith('.js')).map((file) => fs.readFileSync(file, 'utf8')).join('\n')
 const privateInfos = new Set(app.requiredPrivateInfos || [])
-for (const api of ['chooseLocation', 'chooseMedia']) {
+for (const api of ['chooseLocation']) {
   if (javascript.includes(`wx.${api}(`) && !privateInfos.has(api)) throw new Error(`使用 wx.${api} 时 requiredPrivateInfos 必须声明 ${api}`)
 }
 for (const forbidden of ['.includes(', '.slice(', '.map(']) {

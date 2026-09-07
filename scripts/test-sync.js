@@ -43,7 +43,20 @@ async function main() {
   const all = await sync.ownDocuments('footprints')
   if (all.length !== 205) throw new Error('云同步必须分页读取全部远端记录')
 
-  console.log('云同步回归通过：相同文档不重复更新，远端记录完整分页。')
+  const merged = sync.mergeCollection(
+    [{ id: 'local-new', name: '本地新增', updatedAt: 300 }, { id: 'same', name: '本地旧值', updatedAt: 100 }],
+    [{ localId: 'remote-new', id: 'remote-new', name: '云端新增', updatedAt: 250 }, { localId: 'same', id: 'same', name: '云端新值', updatedAt: 200 }]
+  )
+  if (!merged.items.some((item) => item.id === 'local-new') || !merged.items.some((item) => item.id === 'remote-new')) throw new Error('本地和云端的独立新数据必须合并')
+  if (merged.items.find((item) => item.id === 'same').name !== '云端新值') throw new Error('同一记录必须保留时间较新的版本')
+
+  const deleted = sync.mergeCollection(
+    [{ id: 'removed', name: '旧行动', updatedAt: 100 }],
+    [{ localId: 'removed', id: 'removed', _deleted: true, deletedAt: 300, updatedAt: 300 }]
+  )
+  if (deleted.items.some((item) => item.id === 'removed') || deleted.tombstones.removed !== 300) throw new Error('云端删除标记必须阻止旧设备恢复数据')
+
+  console.log('云同步回归通过：相同文档不重复更新，远端记录完整分页，双端新数据和删除标记可正确合并。')
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1 })

@@ -1,0 +1,61 @@
+name: Upload WeChat Mini Program
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wechat-miniprogram-upload
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Upload experience version
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate mini program
+        run: npm run check
+
+      - name: Upload with miniprogram-ci
+        env:
+          WECHAT_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "$WECHAT_PRIVATE_KEY" ]]; then
+            echo "Missing GitHub Actions secret: WECHAT_MINIPROGRAM_PRIVATE_KEY" >&2
+            exit 1
+          fi
+
+          key_path="$RUNNER_TEMP/private.wx1574de4c1ef4b06a.key"
+          trap 'rm -f "$key_path"' EXIT
+          printf '%s\n' "$WECHAT_PRIVATE_KEY" > "$key_path"
+          chmod 600 "$key_path"
+
+          version="1.0.$((GITHUB_RUN_NUMBER - 1))"
+          commit_desc="$(git log -1 --pretty=%s | cut -c1-50)"
+          description="${commit_desc} (${GITHUB_SHA::7})"
+
+          npx --yes miniprogram-ci@2.1.31 upload \
+            --pp "$GITHUB_WORKSPACE" \
+            --pkp "$key_path" \
+            --appid wx1574de4c1ef4b06a \
+            --uv "$version" \
+            --ud "$description" \
+            --robot 1 \
+            --locales zh \
+            --use-project-config true

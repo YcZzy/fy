@@ -2,6 +2,12 @@ const env = require('../config/env')
 
 function isReady() { return Boolean(env.CLOUD_ENV_ID && wx.cloud) }
 function isSyncReady() { return Boolean(isReady() && env.ENABLE_CLOUD_SYNC) }
+function errorMessage(error) { return error && error.message ? error.message : String(error || 'UNKNOWN_CLOUD_ERROR') }
+function warn(message, error) {
+  const detail = errorMessage(error)
+  if (/timeout/i.test(detail)) { console.warn(`${message}：请求超时`); return }
+  console.warn(`${message}：${detail}`)
+}
 
 async function uploadFootprintPhoto(tempFilePath, footprintId) {
   if (!isReady()) throw new Error('CLOUD_NOT_CONFIGURED')
@@ -25,10 +31,16 @@ async function persistPhoto(tempFilePath, footprintId) {
   return { fileId: '', localPath: await saveLocalPhoto(tempFilePath) }
 }
 
+function fileDeleteSucceeded(item) {
+  if (!item) return false
+  const status = Number(item.status)
+  return item.code === 'SUCCESS' || status === 0 || status === -503003
+}
+
 async function deleteCloudFiles(fileIds) {
   if (!isReady() || !fileIds || !fileIds.length) return
   const result = await wx.cloud.deleteFile({ fileList: fileIds })
-  const failed = (result.fileList || []).filter((item) => Number(item.status) !== 0)
+  const failed = (result.fileList || []).filter((item) => !fileDeleteSucceeded(item))
   if (failed.length) {
     const error = new Error('CLOUD_FILE_DELETE_INCOMPLETE')
     error.details = failed
@@ -63,4 +75,4 @@ async function deleteAllPersonalData() {
   return response.result
 }
 
-module.exports = { isReady, isSyncReady, persistPhoto, deleteCloudFiles, flushPendingDeletes, getPhotoUrls, deleteAllPersonalData }
+module.exports = { isReady, isSyncReady, persistPhoto, deleteCloudFiles, flushPendingDeletes, getPhotoUrls, deleteAllPersonalData, errorMessage, warn }

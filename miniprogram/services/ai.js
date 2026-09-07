@@ -29,8 +29,8 @@ async function recommend(state, context) {
   const compact = {
     context,
     domains: state.domains.filter((item) => !item.hidden).map(({ id, name }) => ({ id, name })),
-    actions: state.actions.filter((item) => !item.hidden).map(({ id, name, domainId, minutes, energy, environments, preparation, planId }) => ({ id, name, domainId, minutes, energy, environments, preparation, planId })),
-    focusedPlans: state.plans.filter((item) => item.focused).map(({ id, name, domainId }) => ({ id, name, domainId })),
+    actions: state.actions.filter((item) => !item.hidden).map(({ id, name, domainId, minutes, energy, environments, preparation }) => ({ id, name, domainId, minutes, energy, environments, preparation, planIds: state.plans.filter((plan) => (plan.actionIds || []).includes(id)).map((plan) => plan.id) })),
+    focusedPlans: state.plans.filter((item) => item.focused && item.status !== 'ended').map(({ id, name, domainId, actionIds }) => ({ id, name, domainId, actionIds: actionIds || [] })),
     recent: state.footprints.slice(0, 8).map(({ actionId, actionName, minutes, feeling }) => ({ actionId, actionName, minutes, feeling })),
     selectedInterests: state.preferences.selectedInterests || [],
     declinedActionIds: (state.declinedActions || []).filter((item) => item.declinedAt >= Date.now() - 2 * 60 * 60 * 1000).map((item) => item.actionId).slice(-12)

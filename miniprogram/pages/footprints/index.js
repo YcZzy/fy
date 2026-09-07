@@ -2,29 +2,39 @@ const repository = require('../../services/repository')
 const ai = require('../../services/ai')
 const cloud = require('../../services/cloud')
 const format = require('../../services/format')
+const sync = require('../../services/sync')
+const themeService = require('../../services/theme')
 
 const PERIODS = [{ label: '本周', value: 'week' }, { label: '本月', value: 'month' }, { label: '今年', value: 'year' }, { label: '自定义', value: 'custom' }]
 
 Page({
   data: { tab: 'timeline', footprints: [], periods: PERIODS, period: 'week', startDate: '', endDate: '', stats: null, reviews: [], reviewing: false },
   onShow() {
+    const tabBar = typeof this.getTabBar === 'function' && this.getTabBar()
+    if (tabBar) tabBar.setData({ selected: 2 })
     const state = repository.getState()
     if (state.preferences.openReviewOnNextShow) {
       repository.update((value) => { value.preferences.openReviewOnNextShow = false })
       this.setData({ tab: 'review' })
     }
     this.refresh()
+    sync.bootstrap(['plans', 'footprints', 'reviews'])
+      .then(() => this.refresh())
+      .catch((error) => cloud.warn('足迹云端数据刷新失败，当前继续使用本地数据', error))
   },
   async refresh() {
     const state = repository.getState()
     const fileIds = state.footprints.reduce((all, item) => all.concat(item.photoFileIds || []), [])
     let urls = {}
-    try { urls = await cloud.getPhotoUrls(fileIds) } catch (error) { console.warn('照片临时地址获取失败', error) }
+    try { urls = await cloud.getPhotoUrls(fileIds) } catch (error) { cloud.warn('照片临时地址获取失败，暂时显示文字记录', error) }
     const completionLabels = { done: '', partial: '做了一部分', not_started: '最后没做' }
-    const footprints = state.footprints.map((item) => {
-      const plan = state.plans.find((value) => value.id === item.planId)
-      return { ...item, planName: plan ? plan.name : '', dateLabel: format.dateLabel(item.createdAt), durationLabel: format.duration(item.minutes), completionLabel: completionLabels[item.completionStatus] || '', photo: (item.localPhotoPaths && item.localPhotoPaths[0]) || ((item.photoFileIds && item.photoFileIds[0]) ? urls[item.photoFileIds[0]] : '') }
-    })
+    const footprints = state.footprints
+      .slice()
+      .sort((left, right) => Number(right.createdAt || 0) - Number(left.createdAt || 0))
+      .map((item) => {
+        const plan = state.plans.find((value) => value.id === item.planId)
+        return { ...item, planName: plan ? plan.name : '', dateLabel: format.dateLabel(item.createdAt), durationLabel: format.duration(item.minutes), completionLabel: completionLabels[item.completionStatus] || '', photo: (item.localPhotoPaths && item.localPhotoPaths[0]) || ((item.photoFileIds && item.photoFileIds[0]) ? urls[item.photoFileIds[0]] : '') }
+      })
     this.setData({ footprints }, () => this.calculateStats())
   },
   setTab(event) { this.setData({ tab: event.currentTarget.dataset.value }, () => { if (this.data.tab === 'review') this.calculateStats() }) },
@@ -62,9 +72,9 @@ Page({
   },
   editFootprint(event) {
     const item = repository.getState().footprints.find((footprint) => footprint.id === event.currentTarget.dataset.id)
-    if (item) wx.navigateTo({ url: `/pages/record/index?footprintId=${item.id}&actionId=${item.actionId}&mode=edit` })
+    if (item) wx.navigateTo({ url: themeService.withTheme(`/pages/record/index?footprintId=${item.id}&actionId=${item.actionId}&mode=edit`, 'footprints') })
   },
-  openPlan(event) { wx.navigateTo({ url: `/pages/plan/index?id=${event.currentTarget.dataset.id}` }) },
+  openPlan(event) { wx.navigateTo({ url: themeService.withTheme(`/pages/plan/index?id=${event.currentTarget.dataset.id}`, 'footprints') }) },
   deleteFootprint(event) {
     const id = event.currentTarget.dataset.id
     const item = repository.getState().footprints.find((footprint) => footprint.id === id)

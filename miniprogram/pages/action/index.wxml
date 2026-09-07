@@ -1,4 +1,4 @@
-<view class="page action-page"><view class="page-content" wx:if="{{action}}">
+<view class="page action-page context-page theme-{{theme}}"><view class="page-content" wx:if="{{action}}">
   <view class="action-orbit"><view class="action-orbit-inner">{{action.domainInitial}}</view></view>
   <text class="eyebrow">{{action.domainName}}</text>
   <view class="action-title">{{action.name}}</view>

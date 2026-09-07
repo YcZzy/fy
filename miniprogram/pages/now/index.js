@@ -2,6 +2,9 @@ const repository = require('../../services/repository')
 const recommender = require('../../services/recommender')
 const ai = require('../../services/ai')
 const format = require('../../services/format')
+const cloud = require('../../services/cloud')
+const sync = require('../../services/sync')
+const themeService = require('../../services/theme')
 
 const TIME_OPTIONS = [{ label: '10 分钟', value: 10 }, { label: '30 分钟', value: 30 }, { label: '1 小时', value: 60 }, { label: '2 小时', value: 120 }, { label: '半天', value: 240 }, { label: '自定义', value: -1 }]
 const ENERGY_OPTIONS = [{ label: '很累', value: 'low' }, { label: '一般', value: 'medium' }, { label: '状态不错', value: 'high' }]
@@ -11,14 +14,19 @@ Page({
   data: {
     greeting: '', timeOptions: TIME_OPTIONS, energyOptions: ENERGY_OPTIONS, envOptions: ENV_OPTIONS,
     context: { minutes: 30, energy: 'medium', environment: 'any', note: '', locationSummary: '' },
-    focusedPlans: [], recommendations: [], generating: false, recommendationSource: '', activeSession: null, activeElapsed: '',
+    continueActions: [], recommendations: [], generating: false, recommendationSource: '', activeSession: null, activeElapsed: '',
     pendingAction: null
   },
   onLoad() { this.timer = null },
   onShow() {
+    const tabBar = typeof this.getTabBar === 'function' && this.getTabBar()
+    if (tabBar) tabBar.setData({ selected: 0 })
     const state = repository.getState()
     if (!state.preferences.onboardingComplete) { wx.redirectTo({ url: '/pages/onboarding/index' }); return }
     this.refresh(state)
+    sync.bootstrap(['preferences', 'domains', 'actions', 'plans', 'footprints'])
+      .then(() => this.refresh())
+      .catch((error) => cloud.warn('此刻云端数据刷新失败，当前继续使用本地数据', error))
     if (this.shouldPromptPending(state.pendingAction)) { this.promptPending(state.pendingAction); return }
     if (this.shouldPromptReminder(state.activeSession)) { this.promptActiveReminder(); return }
     this.maybePromptWeeklyReview()
@@ -26,25 +34,34 @@ Page({
   onHide() { this.clearTicker() },
   onUnload() { this.clearTicker() },
   refresh(state = repository.getState()) {
-    const focusedPlans = state.plans.filter((item) => item.focused && item.status !== 'ended').slice(0, 3).map((plan) => this.decoratePlan(plan, state))
+    const continueActions = this.buildContinueActions(state, state.preferences.lastContext)
     this.setData({
-      greeting: format.greeting(), context: state.preferences.lastContext, focusedPlans,
+      greeting: format.greeting(), context: state.preferences.lastContext, continueActions,
       recommendations: state.recommendationCache && state.recommendationCache.key === recommender.contextKey(state.preferences.lastContext) ? state.recommendationCache.items : [],
       recommendationSource: state.recommendationCache && state.recommendationCache.key === recommender.contextKey(state.preferences.lastContext) ? state.recommendationCache.source : '',
       activeSession: state.activeSession, pendingAction: state.pendingAction
     })
     this.startTicker()
   },
-  decoratePlan(plan, state) {
-    const footprints = state.footprints.filter((item) => item.planId === plan.id)
-    const minutes = footprints.reduce((sum, item) => sum + (item.minutes || 0), 0)
-    return {
-      ...plan,
-      count: footprints.length,
-      duration: format.duration(minutes),
-      lastAction: footprints[0] ? footprints[0].actionName : '还没有开始',
-      lastFeeling: footprints[0] ? footprints[0].feelingLabel : '还没有留下感受'
-    }
+  buildContinueActions(state, context) {
+    const focusedPlans = state.plans
+      .filter((item) => item.focused && item.status !== 'ended')
+      .sort((left, right) => Number(right.focusedAt || right.updatedAt || right.createdAt || 0) - Number(left.focusedAt || left.updatedAt || left.createdAt || 0))
+      .slice(0, 3)
+    const seen = new Set()
+    const continueActions = []
+    focusedPlans.forEach((plan, planOrder) => {
+      ;(plan.actionIds || []).forEach((actionId) => {
+        if (seen.has(actionId)) return
+        const action = state.actions.find((item) => item.id === actionId && !item.hidden && item.domainId === plan.domainId)
+        if (!action) return
+        seen.add(actionId)
+        const domain = state.domains.find((item) => item.id === action.domainId)
+        continueActions.push({ ...action, planId: plan.id, planName: plan.name, planOrder, suitableNow: recommender.isEligible(action, state, context), domainName: (domain && domain.name) || '生活', domainColor: (domain && domain.color) || '#A87562', duration: format.duration(action.minutes) })
+      })
+    })
+    continueActions.sort((left, right) => Number(right.suitableNow) - Number(left.suitableNow) || left.planOrder - right.planOrder || Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
+    return continueActions.slice(0, 3)
   },
   selectTime(event) {
     const value = Number(event.currentTarget.dataset.value)
@@ -64,7 +81,7 @@ Page({
   onNoteInput(event) { this.updateContext('note', event.detail.value, false) },
   updateContext(key, value, persist = true) {
     const context = { ...this.data.context, [key]: value }
-    this.setData({ context, recommendations: [], recommendationSource: '' })
+    this.setData({ context, continueActions: this.buildContinueActions(repository.getState(), context), recommendations: [], recommendationSource: '' })
     if (persist) repository.saveContext(context)
   },
   requestFuzzyLocation() {
@@ -78,7 +95,7 @@ Page({
           success: (value) => {
             const summary = String(value.address || value.name || '已确认所在地区').slice(0, 30)
             const context = { ...this.data.context, environment: 'location', locationSummary: summary }
-            this.setData({ context, recommendations: [], recommendationSource: '' })
+            this.setData({ context, continueActions: this.buildContinueActions(repository.getState(), context), recommendations: [], recommendationSource: '' })
             repository.saveContext(context)
           },
           fail: () => this.enterManualRegion('位置没有授权，可以手动写城市或区域')
@@ -90,7 +107,7 @@ Page({
     wx.showModal({ title, editable: true, placeholderText: '例如：北京朝阳', confirmText: '使用', success: (res) => {
       if (!res.confirm || !res.content.trim()) { this.updateContext('environment', 'any'); return }
       const context = { ...this.data.context, environment: 'manual', locationSummary: res.content.trim().slice(0, 30) }
-      this.setData({ context, recommendations: [], recommendationSource: '' }); repository.saveContext(context)
+      this.setData({ context, continueActions: this.buildContinueActions(repository.getState(), context), recommendations: [], recommendationSource: '' }); repository.saveContext(context)
     } })
   },
   similarAction(event) {
@@ -101,8 +118,8 @@ Page({
     const replacement = state.actions.find((item) => item.id !== id && item.domainId === current.domainId && recommender.isEligible(item, state, this.data.context) && !this.data.recommendations.some((shown) => shown.id === item.id))
     if (!replacement) { wx.showToast({ title: '暂时没有更相近的选择', icon: 'none' }); return }
     const domain = state.domains.find((item) => item.id === replacement.domainId)
-    const plan = state.plans.find((value) => value.id === replacement.planId)
-    const item = { ...replacement, domainName: domain.name, domainColor: domain.color, reason: '换一种相近的方式，也许更合此刻的心意。', planName: plan ? plan.name : '', locationNote: replacement.environments.includes('location') ? '仅提供活动类别，请自行确认具体地点与营业信息。' : '' }
+    const plan = state.plans.find((value) => value.focused && value.status !== 'ended' && (value.actionIds || []).includes(replacement.id)) || state.plans.find((value) => (value.actionIds || []).includes(replacement.id))
+    const item = { ...replacement, planId: plan ? plan.id : '', domainName: domain.name, domainColor: domain.color, reason: '换一种相近的方式，也许更合此刻的心意。', planName: plan ? plan.name : '', locationNote: replacement.environments.includes('location') ? '仅提供活动类别，请自行确认具体地点与营业信息。' : '' }
     const recommendations = this.data.recommendations.map((shown) => shown.id === id ? item : shown)
     const swaps = state.recommendationCache ? state.recommendationCache.swaps : 0
     repository.saveRecommendations(recommendations, recommender.contextKey(this.data.context), 'rule', swaps)
@@ -141,25 +158,34 @@ Page({
     if (item && item.source === 'ai' && !repository.getState().actions.some((value) => value.id === id)) {
       repository.saveAction({ id: item.id, name: item.name, domainId: item.domainId, minutes: item.minutes, energy: item.energy, environments: item.environments, preparation: item.preparation, planId: item.planId || '', source: 'ai' })
     }
-    wx.navigateTo({ url: `/pages/action/index?id=${id}` })
+    const planId = (item && item.planId) || ''
+    wx.navigateTo({ url: themeService.withTheme(`/pages/action/index?id=${id}${planId ? `&planId=${planId}` : ''}`, 'now') })
   },
   declineAction(event) {
     repository.declineAction(event.currentTarget.dataset.id, recommender.contextKey(this.data.context))
     this.swapGroup()
   },
-  continuePlan(event) {
-    wx.navigateTo({ url: `/pages/plan/index?id=${event.currentTarget.dataset.id}` })
+  continueAction(event) {
+    const { id, planId } = event.currentTarget.dataset
+    wx.navigateTo({ url: themeService.withTheme(`/pages/action/index?id=${id}&planId=${planId}`, 'now') })
   },
-  openChat() { wx.navigateTo({ url: '/pages/chat/index' }) },
-  openSettings() { wx.navigateTo({ url: '/pages/settings/index' }) },
-  openActive() { wx.navigateTo({ url: `/pages/action/index?id=${this.data.activeSession.actionId}` }) },
+  openChat() { wx.navigateTo({ url: themeService.withTheme('/pages/chat/index', 'now') }) },
+  openSettings() { wx.navigateTo({ url: themeService.withTheme('/pages/settings/index', 'now') }) },
+  openActive() {
+    const planId = (this.data.activeSession.actionSnapshot && this.data.activeSession.actionSnapshot.planId) || ''
+    wx.navigateTo({ url: themeService.withTheme(`/pages/action/index?id=${this.data.activeSession.actionId}${planId ? `&planId=${planId}` : ''}`, 'now') })
+  },
   shouldPromptPending(pending) { return Boolean(pending && !pending.prompted && pending.backgroundedAt && Date.now() >= (pending.promptAfterAt || pending.startedAt + 60000)) },
   promptPending(pending) {
     repository.update((state) => { if (state.pendingAction) state.pendingAction.prompted = true })
     wx.showActionSheet({
       alertText: `刚才“${pending.actionName}”，后来去做了吗？`,
       itemList: ['做了，留个足迹', '没有', '暂时不记录'],
-      success: (res) => { if (res.tapIndex === 0) wx.navigateTo({ url: `/pages/record/index?actionId=${pending.actionId}&mode=direct` }); else repository.resolvePending() }
+      success: (res) => {
+        const planId = (pending.actionSnapshot && pending.actionSnapshot.planId) || ''
+        if (res.tapIndex === 0) wx.navigateTo({ url: themeService.withTheme(`/pages/record/index?actionId=${pending.actionId}&mode=direct${planId ? `&planId=${planId}` : ''}`, 'now') })
+        else repository.resolvePending()
+      }
     })
   },
   shouldPromptReminder(session) { return Boolean(session && session.reminder && !session.reminderPrompted && session.status === 'running' && Date.now() >= session.expectedEndAt) },
@@ -168,7 +194,10 @@ Page({
     wx.showActionSheet({ alertText: '预计时间到了，想怎么继续？', itemList: ['结束并记录', '继续 15 分钟', '不再提醒'], success: (res) => {
       const session = repository.getState().activeSession
       if (!session) return
-      if (res.tapIndex === 0) wx.navigateTo({ url: `/pages/record/index?actionId=${session.actionId}&mode=timer` })
+      if (res.tapIndex === 0) {
+        const planId = (session.actionSnapshot && session.actionSnapshot.planId) || ''
+        wx.navigateTo({ url: themeService.withTheme(`/pages/record/index?actionId=${session.actionId}&mode=timer${planId ? `&planId=${planId}` : ''}`, 'now') })
+      }
       if (res.tapIndex === 1) repository.update((state) => { if (state.activeSession) { state.activeSession.expectedEndAt = Date.now() + 15 * 60000; state.activeSession.reminderPrompted = false } })
     } })
   },

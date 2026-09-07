@@ -2,6 +2,7 @@ const { createInitialState, DOMAINS, ACTIONS } = require('../data/defaults')
 const { uid } = require('./format')
 
 const STORAGE_KEY = 'feng_yue_state_v1'
+const STATE_VERSION = 4
 const SYNC_COLLECTIONS = {
   preferences: 'user_preferences',
   domains: 'life_domains',
@@ -13,10 +14,88 @@ const SYNC_COLLECTIONS = {
   wishes: 'wishes'
 }
 
+function normalizeSyncQueue(queue) {
+  const byCollection = {}
+  ;(queue || []).forEach((item) => {
+    const value = typeof item === 'string' ? { collection: item, queuedAt: 0 } : item
+    if (!value || !value.collection) return
+    const current = byCollection[value.collection]
+    if (!current || Number(value.queuedAt || 0) > Number(current.queuedAt || 0)) byCollection[value.collection] = { collection: value.collection, queuedAt: Number(value.queuedAt || 0) }
+  })
+  return Object.values(byCollection)
+}
+
+function queueCollections(state, collections, queuedAt = Date.now()) {
+  const queue = normalizeSyncQueue(state.syncQueue)
+  const names = new Set(collections || [])
+  const previous = queue.reduce((result, item) => { result[item.collection] = item.queuedAt; return result }, {})
+  state.syncQueue = queue.filter((item) => !names.has(item.collection))
+  names.forEach((collection) => state.syncQueue.push({ collection, queuedAt: Math.max(queuedAt, Number(previous[collection] || 0) + 1) }))
+}
+
+function recordDeletedItems(before, after, changedKeys) {
+  after.syncTombstones = after.syncTombstones || {}
+  const deletedAt = Date.now()
+  changedKeys.forEach((key) => {
+    if (!Array.isArray(before[key]) || !Array.isArray(after[key])) return
+    const liveIds = new Set(after[key].map((item) => item && item.id).filter(Boolean))
+    const removed = before[key].filter((item) => item && item.id && !liveIds.has(item.id))
+    const tombstones = { ...(after.syncTombstones[key] || {}) }
+    removed.forEach((item) => { tombstones[item.id] = Math.max(Number(tombstones[item.id] || 0), deletedAt) })
+    liveIds.forEach((id) => { delete tombstones[id] })
+    after.syncTombstones[key] = tombstones
+  })
+}
+
 function changedCollections(before, after) {
   return Object.keys(SYNC_COLLECTIONS)
     .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
     .map((key) => SYNC_COLLECTIONS[key])
+}
+
+function normalizeState(state) {
+  const initial = createInitialState()
+  let changed = false
+  const upgrading = state.version !== STATE_VERSION
+  const setDefault = (key, value) => {
+    if (state[key] !== undefined && state[key] !== null) return
+    state[key] = value
+    changed = true
+  }
+  const missingDomains = upgrading ? DOMAINS.filter((item) => !(state.domains || []).some((existing) => existing.id === item.id)) : []
+  const missingActions = upgrading ? ACTIONS.filter((item) => !(state.actions || []).some((existing) => existing.id === item.id)) : []
+  state.domains = [...(state.domains || []), ...missingDomains]
+  state.actions = [...(state.actions || []), ...missingActions]
+  if (missingDomains.length || missingActions.length) changed = true
+  setDefault('preferences', initial.preferences)
+  ;['plans', 'wishes', 'footprints', 'reviews', 'conversations'].forEach((key) => setDefault(key, []))
+  setDefault('declinedActions', state.declinedActionIds || [])
+  setDefault('pendingFileDeletes', [])
+  setDefault('syncQueue', [])
+  setDefault('syncTombstones', {})
+
+  const plansById = new Map((state.plans || []).map((plan) => [plan.id, plan]))
+  state.plans.forEach((plan) => {
+    const actionIds = [...new Set((plan.actionIds || []).filter(Boolean))]
+    if (JSON.stringify(actionIds) !== JSON.stringify(plan.actionIds || [])) changed = true
+    plan.actionIds = actionIds
+  })
+  state.actions.forEach((action) => {
+    const legacyPlanIds = [...(Array.isArray(action.planIds) ? action.planIds : []), action.planId].filter(Boolean)
+    legacyPlanIds.forEach((planId) => {
+      const plan = plansById.get(planId)
+      if (plan && !plan.actionIds.includes(action.id)) { plan.actionIds.push(action.id); plan.updatedAt = Date.now(); changed = true }
+    })
+    if (Object.prototype.hasOwnProperty.call(action, 'planId')) { delete action.planId; changed = true }
+    if (Object.prototype.hasOwnProperty.call(action, 'planIds')) { delete action.planIds; changed = true }
+  })
+  if (Object.prototype.hasOwnProperty.call(state, 'declinedActionIds')) { delete state.declinedActionIds; changed = true }
+  const declinedActions = (state.declinedActions || []).map((item) => typeof item === 'string' ? { actionId: item, declinedAt: 0, contextKey: '' } : item)
+  if (JSON.stringify(declinedActions) !== JSON.stringify(state.declinedActions || [])) { state.declinedActions = declinedActions; changed = true }
+  state.syncQueue = normalizeSyncQueue(state.syncQueue)
+  state.syncTombstones = state.syncTombstones || {}
+  if (state.version !== STATE_VERSION) { state.version = STATE_VERSION; changed = true }
+  return changed
 }
 
 function ensureState() {
@@ -24,34 +103,25 @@ function ensureState() {
   if (!state || typeof state !== 'object' || Array.isArray(state)) {
     state = createInitialState()
     wx.setStorageSync(STORAGE_KEY, state)
-  } else if (state.version !== 3) {
-    state.domains = [...(state.domains || []), ...DOMAINS.filter((item) => !(state.domains || []).some((existing) => existing.id === item.id))]
-    state.actions = [...(state.actions || []), ...ACTIONS.filter((item) => !(state.actions || []).some((existing) => existing.id === item.id))]
-    state.preferences = state.preferences || createInitialState().preferences
-    state.plans = state.plans || []
-    state.wishes = state.wishes || []
-    state.footprints = state.footprints || []
-    state.reviews = state.reviews || []
-    state.conversations = state.conversations || []
-    state.declinedActions = (state.declinedActions || state.declinedActionIds || []).map((item) => typeof item === 'string' ? { actionId: item, declinedAt: 0, contextKey: '' } : item)
-    delete state.declinedActionIds
-    state.pendingFileDeletes = state.pendingFileDeletes || []
-    state.syncQueue = state.syncQueue || []
-    state.version = 3
+  } else if (normalizeState(state)) {
+    queueCollections(state, ['actions', 'plans'])
     wx.setStorageSync(STORAGE_KEY, state)
   }
+  state.syncQueue = normalizeSyncQueue(state.syncQueue)
+  state.syncTombstones = state.syncTombstones || {}
   return state
 }
 
 function getState() { return ensureState() }
 function saveState(state, options = {}) {
   if (!state || typeof state !== 'object' || Array.isArray(state)) throw new TypeError('INVALID_STATE')
+  const collections = options.sync === false ? [] : (options.collections || Object.values(SYNC_COLLECTIONS))
+  if (collections.length) queueCollections(state, collections)
   state.updatedAt = Date.now()
   wx.setStorageSync(STORAGE_KEY, state)
   try {
     const env = require('../config/env')
     if (options.sync !== false && env.CLOUD_ENV_ID && env.ENABLE_CLOUD_SYNC && wx.cloud) {
-      const collections = options.collections || Object.values(SYNC_COLLECTIONS)
       if (collections.length) require('./sync').schedule(state, collections)
     }
   } catch (error) { console.warn('同步队列暂不可用', error) }
@@ -62,7 +132,10 @@ function update(mutator) {
   const before = JSON.parse(JSON.stringify(state))
   // repository 的更新器只允许原地修改状态；忽略 push/unshift 等方法的数字返回值。
   mutator(state)
-  return saveState(state, { collections: changedCollections(before, state) })
+  const changedKeys = Object.keys(SYNC_COLLECTIONS).filter((key) => JSON.stringify(before[key]) !== JSON.stringify(state[key]))
+  recordDeletedItems(before, state, changedKeys)
+  if (changedKeys.some((key) => ['preferences', 'domains', 'actions', 'plans', 'footprints'].includes(key))) state.recommendationCache = null
+  return saveState(state, { collections: changedKeys.map((key) => SYNC_COLLECTIONS[key]) })
 }
 function completeOnboarding(interests, wish) {
   return update((state) => {
@@ -156,24 +229,62 @@ function queueFileDeletes(fileIds) {
 function savePlan(plan) {
   return update((state) => {
     const index = state.plans.findIndex((item) => item.id === plan.id)
-    const value = { ...plan, id: plan.id || uid('p'), updatedAt: Date.now(), createdAt: plan.createdAt || Date.now() }
+    const validActionIds = new Set(state.actions.filter((item) => !item.hidden && item.domainId === plan.domainId).map((item) => item.id))
+    const value = { ...plan, actionIds: [...new Set((plan.actionIds || []).filter((id) => validActionIds.has(id)))], id: plan.id || uid('p'), updatedAt: Date.now(), createdAt: plan.createdAt || Date.now() }
     if (index >= 0) state.plans[index] = value
     else state.plans.unshift(value)
   })
 }
 function addWish(text) { return update((state) => { state.wishes.unshift({ id: uid('w'), text: text.trim(), createdAt: Date.now() }) }) }
 function deleteWish(id) { return update((state) => { state.wishes = state.wishes.filter((item) => item.id !== id) }) }
-function saveAction(action) {
+function saveActionWithPlans(action, planIds = []) {
+  const actionId = action.id || uid('a')
   return update((state) => {
-    const index = state.actions.findIndex((item) => item.id === action.id)
-    const value = { energy: ['low','medium','high'], environments: ['any'], preparation: '不需要额外准备', source: 'user', ...action, id: action.id || uid('a'), updatedAt: Date.now() }
+    const index = state.actions.findIndex((item) => item.id === actionId)
+    const value = { energy: ['low','medium','high'], environments: ['any'], preparation: '不需要额外准备', source: 'user', ...action, id: actionId, updatedAt: Date.now() }
+    delete value.planId
+    delete value.planIds
     if (index >= 0) state.actions[index] = value
     else state.actions.unshift(value)
+    const selected = new Set((planIds || []).filter(Boolean))
+    state.plans.forEach((plan) => {
+      const actionIds = new Set(plan.actionIds || [])
+      const before = [...actionIds]
+      if (selected.has(plan.id) && plan.domainId === value.domainId && plan.status !== 'ended') actionIds.add(actionId)
+      else actionIds.delete(actionId)
+      plan.actionIds = [...actionIds]
+      if (JSON.stringify(before) !== JSON.stringify(plan.actionIds)) plan.updatedAt = Date.now()
+    })
   })
 }
-function hideAction(id) { return update((state) => { const action = state.actions.find((item) => item.id === id); if (action) action.hidden = true }) }
+function saveAction(action) {
+  const legacyPlanId = action.planId || ''
+  const state = getState()
+  const existingPlanIds = action.id ? state.plans.filter((plan) => (plan.actionIds || []).includes(action.id)).map((plan) => plan.id) : []
+  return saveActionWithPlans(action, legacyPlanId ? [...new Set([...existingPlanIds, legacyPlanId])] : existingPlanIds)
+}
+function setPlanAction(planId, actionId, linked) {
+  return update((state) => {
+    const plan = state.plans.find((item) => item.id === planId)
+    const action = state.actions.find((item) => item.id === actionId)
+    if (!plan || !action) return
+    const actionIds = new Set(plan.actionIds || [])
+    if (linked && plan.status !== 'ended' && plan.domainId === action.domainId) actionIds.add(actionId)
+    else actionIds.delete(actionId)
+    plan.actionIds = [...actionIds]
+    plan.updatedAt = Date.now()
+  })
+}
+function hideAction(id) { return update((state) => { const action = state.actions.find((item) => item.id === id); if (action) { action.hidden = true; action.updatedAt = Date.now() } }) }
 function deleteAction(id) {
-  return update((state) => { state.actions = state.actions.filter((item) => item.id !== id) })
+  return update((state) => {
+    state.actions = state.actions.filter((item) => item.id !== id)
+    state.plans.forEach((plan) => {
+      const actionIds = (plan.actionIds || []).filter((actionId) => actionId !== id)
+      if (actionIds.length !== (plan.actionIds || []).length) plan.updatedAt = Date.now()
+      plan.actionIds = actionIds
+    })
+  })
 }
 function saveReview(review) { return update((state) => { state.reviews.unshift({ id: uid('r'), createdAt: Date.now(), ...review }) }) }
 function updateReview(id, content) {
@@ -203,6 +314,6 @@ module.exports = {
   saveRecommendations, clearRecommendationCache, incrementRecommendationSwaps, declineAction, startSession, markPendingActionBackgrounded,
   pauseSession, resumeSession, clearSession, resolvePending, reconcileActiveSession,
   addFootprint, saveFootprint, deleteFootprint, queueFileDeletes, savePlan, addWish, deleteWish, saveReview,
-  saveAction, hideAction, deleteAction, saveConversation, clearConversations, deleteAllPersonalData, updateReview, deleteReview,
-  changedCollections
+  saveAction, saveActionWithPlans, setPlanAction, hideAction, deleteAction, saveConversation, clearConversations, deleteAllPersonalData, updateReview, deleteReview,
+  changedCollections, normalizeState
 }

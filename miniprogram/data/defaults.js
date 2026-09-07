@@ -12,7 +12,7 @@ const DOMAINS = [
 const ACTIONS = [
   { id: 'a_walk', name: '下楼散步 20 分钟', domainId: 'health', minutes: 20, energy: ['low','medium','high'], environments: ['outdoor','any'], preparation: '穿一双舒服的鞋', source: 'system' },
   { id: 'a_stretch', name: '跟着呼吸舒展身体', domainId: 'health', minutes: 10, energy: ['low','medium','high'], environments: ['home','any'], preparation: '留出一小块空地', source: 'system' },
-  { id: 'a_english', name: '听一段 15 分钟英语', domainId: 'learn', minutes: 15, energy: ['medium','high'], environments: ['home','commute','any'], preparation: '耳机', source: 'system', planId: 'p_english' },
+  { id: 'a_english', name: '听一段 15 分钟英语', domainId: 'learn', minutes: 15, energy: ['medium','high'], environments: ['home','commute','any'], preparation: '耳机', source: 'system' },
   { id: 'a_city', name: '了解一座城市的生活成本', domainId: 'travel', minutes: 30, energy: ['medium','high'], environments: ['home','any'], preparation: '选一座最近好奇的城市', source: 'system' },
   { id: 'a_friend', name: '给一位朋友发条近况', domainId: 'connect', minutes: 10, energy: ['low','medium','high'], environments: ['home','commute','any'], preparation: '想起一个人就够了', source: 'system' },
   { id: 'a_game', name: '安心玩一小时游戏', domainId: 'rest', minutes: 60, energy: ['low','medium','high'], environments: ['home'], preparation: '选一款现在想玩的', source: 'system' },
@@ -29,14 +29,14 @@ const ACTIONS = [
 ]
 
 const PLANS = [
-  { id: 'p_english', name: '六周英语体验', domainId: 'learn', why: '想看看外语能否重新进入日常', status: 'active', focused: true, createdAt: Date.now() - 86400000 * 4, updatedAt: Date.now() - 86400000 },
-  { id: 'p_beijing', name: '北京街区探索', domainId: 'travel', why: '多认识一些下班后也能去的地方', status: 'want', focused: true, createdAt: Date.now() - 86400000 * 2, updatedAt: Date.now() - 86400000 * 2 }
+  { id: 'p_english', name: '六周英语体验', domainId: 'learn', why: '想看看外语能否重新进入日常', status: 'active', focused: true, actionIds: ['a_english'], createdAt: Date.now() - 86400000 * 4, updatedAt: Date.now() - 86400000 },
+  { id: 'p_beijing', name: '北京街区探索', domainId: 'travel', why: '多认识一些下班后也能去的地方', status: 'want', focused: true, actionIds: [], createdAt: Date.now() - 86400000 * 2, updatedAt: Date.now() - 86400000 * 2 }
 ]
 
 function createInitialState() {
   const now = Date.now()
   return {
-    version: 3,
+    version: 4,
     preferences: {
       onboardingComplete: false,
       selectedInterests: [],
@@ -56,7 +56,8 @@ function createInitialState() {
     recommendationCache: null,
     declinedActions: [],
     pendingFileDeletes: [],
-    syncQueue: []
+    syncQueue: [],
+    syncTombstones: {}
   }
 }
 
