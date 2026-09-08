@@ -15,13 +15,15 @@ concurrency:
 
 jobs:
   upload:
-    name: Upload experience version
+    name: Upload development version
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -34,21 +36,43 @@ jobs:
       - name: Upload with miniprogram-ci
         env:
           WECHAT_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
+          VERSION_BASE_COMMIT: 8dbc353522cd7ad225cf501c73a5d09d1285b55c
         shell: bash
         run: |
+          set -euo pipefail
+
           if [[ -z "$WECHAT_PRIVATE_KEY" ]]; then
-            echo "Missing GitHub Actions secret: WECHAT_MINIPROGRAM_PRIVATE_KEY" >&2
+            echo "::error::Missing WECHAT_MINIPROGRAM_PRIVATE_KEY. Add the code upload .key file for wx1574de4c1ef4b06a to repository Actions secrets; AppSecret is not an upload key."
             exit 1
           fi
 
           key_path="$RUNNER_TEMP/private.wx1574de4c1ef4b06a.key"
           trap 'rm -f "$key_path"' EXIT
+          umask 077
           printf '%s\n' "$WECHAT_PRIVATE_KEY" > "$key_path"
           chmod 600 "$key_path"
 
-          version="1.0.$((GITHUB_RUN_NUMBER - 1))"
+          if ! openssl rsa -in "$key_path" -passin pass: -check -noout >/dev/null 2>&1; then
+            echo "::error::WECHAT_MINIPROGRAM_PRIVATE_KEY must contain the complete RSA code upload key, not AppSecret or a file path."
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$VERSION_BASE_COMMIT" HEAD; then
+            echo "::error::Version base commit is not an ancestor of HEAD: $VERSION_BASE_COMMIT"
+            exit 1
+          fi
+
+          commits_since_base="$(git rev-list --first-parent --count "${VERSION_BASE_COMMIT}..HEAD")"
+          if (( commits_since_base < 1 )); then
+            echo "::error::No release commit found after version base commit: $VERSION_BASE_COMMIT"
+            exit 1
+          fi
+
+          version="1.1.$((commits_since_base - 1))"
           commit_desc="$(git log -1 --pretty=%s | cut -c1-50)"
           description="${commit_desc} (${GITHUB_SHA::7})"
+
+          echo "Uploading mini program version: $version"
 
           npx --yes miniprogram-ci@2.1.31 upload \
             --pp "$GITHUB_WORKSPACE" \
@@ -59,3 +83,12 @@ jobs:
             --robot 1 \
             --locales zh \
             --use-project-config true
+
+          {
+            echo "### WeChat mini program uploaded"
+            echo "- AppID: wx1574de4c1ef4b06a"
+            echo "- Version: $version"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- CI robot: 1"
+            echo "- Check the experience-version association in WeChat version management."
+          } >> "$GITHUB_STEP_SUMMARY"

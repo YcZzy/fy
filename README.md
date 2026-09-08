@@ -52,8 +52,20 @@ npm run check:native
 
 这些检查不替代模拟器和真机验收。发布前仍需验证小屏布局、长文本、系统字体、键盘遮挡、位置授权、照片私有访问、断网恢复、两台设备同步及 AI 实际响应。审查基线、修改范围与剩余事项见 `docs/audit/`。
 
-## GitHub 自动上传体验版
+## GitHub 自动上传与体验版配置
 
-当前工作流在推送 `main` 或手动触发时，先运行 `npm run check`，再使用 `miniprogram-ci` 上传小程序。上传不部署云函数或权限。版本号按工作流运行次数递增。
+参考 aiyc，工作流在每次推送 `main` 或手动触发时，先运行 `npm run check`，再使用微信官方 `miniprogram-ci@2.1.31` 和固定的 CI 机器人 1 上传小程序。上传不部署云函数或权限。
 
-启用前，在微信公众平台生成对应 AppID 的代码上传密钥，并将完整内容保存为仓库 Secret `WECHAT_MINIPROGRAM_PRIVATE_KEY`；如启用上传 IP 白名单，还需配置 Runner 出口访问。密钥不能提交到仓库，项目已忽略 `private.*.key`。
+首次配置：
+
+1. 登录微信公众平台，确认小程序 AppID 为 `wx1574de4c1ef4b06a`。
+2. 在「开发管理 → 开发设置 → 小程序代码上传」下载代码上传密钥 `.key` 文件。**AppSecret 不能代替代码上传密钥**，本工作流不需要 AppSecret。
+3. 在 [GitHub Actions Secrets](https://github.com/YcZzy/fy/settings/secrets/actions) 新建 `WECHAT_MINIPROGRAM_PRIVATE_KEY`，填入密钥文件完整内容（包含 BEGIN / END 行），不要填文件路径。
+4. GitHub 托管 Runner 的出口 IP 不固定。如启用微信代码上传 IP 白名单，需要改用固定出口的 Runner 并加入白名单；使用托管 Runner 时，需由管理员按实际安全要求调整微信侧白名单设置。
+5. 在 [GitHub Actions](https://github.com/YcZzy/fy/actions/workflows/wechat-miniprogram-upload.yml) 手动运行一次，确认上传成功，再到微信公众平台「开发管理 → 版本管理」将 CI 机器人 1 的开发版本设为体验版，并验证体验码访问的是最新代码。
+
+`miniprogram-ci upload` 执行的是开发版本上传，工作流不包含“设为体验版”接口调用。固定机器人可持续更新同一上传槽位；体验版是否已关联该槽位、后续上传是否按预期更新，需要在微信后台及体验码中确认，不能仅凭 Actions 成功判定。参考[微信官方 CI 文档](https://developers.weixin.qq.com/miniprogram/dev/devtools/ci.html)。
+
+版本号使用 aiyc 的 Git 提交历史规则：以 `8dbc353522cd7ad225cf501c73a5d09d1285b55c` 为基线，之后第一个主线提交为 `1.1.0`，后续主线提交依次为 `1.1.1`、`1.1.2`。同一提交重跑版本不变；基线不在当前历史中时上传失败，避免错误计算版本。并发上传不会中断正在执行的任务。
+
+上传密钥只写入 Runner 临时目录，退出时删除；缺少密钥或误填 AppSecret 会明确报错。密钥不能提交到仓库，项目已忽略 `private.*.key`。
