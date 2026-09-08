@@ -6,6 +6,8 @@ const db = cloud.database()
 const COLLECTIONS = ['user_preferences', 'life_domains', 'actions', 'plans', 'wishes', 'footprints', 'reviews', 'ai_conversations', 'ai_usage']
 const SYNC_COLLECTIONS = COLLECTIONS.filter((name) => name !== 'ai_usage')
 const CONTROL = 'sync_control'
+const DELETE_COLLECTION_CONCURRENCY = 3
+const DELETE_BUDGET_MS = 5000
 const hash = value => crypto.createHash('sha256').update(value).digest('hex').slice(0, 40)
 const protocol = value => ({ protocol: 2, ...value })
 
@@ -37,25 +39,31 @@ async function getAllOwned(collection, openid) {
   return records
 }
 
-async function removeOwned(collection, openid, deletion) {
-  while (true) {
-    const result = await db.collection(collection).where({ _openid: openid }).limit(20).get()
-    if (!result.data.length) break
-    const removed = await db.runTransaction(async (tx) => {
-      const controlRef = tx.collection(CONTROL).doc(hash(openid))
-      const current = await readDoc(controlRef)
-      if (!current || !current.deleting || current.epoch !== deletion.epoch || current.deleteRequestId !== deletion.requestId) return false
-      for (const item of result.data) {
-        const ref = tx.collection(collection).doc(item._id)
-        const value = await readDoc(ref)
-        if (value && value._openid === openid) await ref.remove()
-      }
-      await controlRef.update({ data: { revision: (current.revision || 0) + 1 } })
-      return true
-    })
-    // A duplicate or timed-out delete must not erase data created after reset.
-    if (!removed) break
-  }
+async function removeOwnedCollection(collection, openid, epoch) {
+  const _ = db.command
+  // The database evaluates the version predicate when removing each document.
+  // A delayed invocation cannot match data written after this reset.
+  const query = _.or([
+    { _openid: openid, syncEpoch: _.lt(epoch) },
+    { _openid: openid, syncEpoch: _.exists(false) }
+  ])
+  await db.collection(collection).where(query).remove()
+  // Do not mark a partially applied/limited bulk operation as complete.
+  const remaining = await db.collection(collection).where(query).limit(1).get()
+  return { collection, done: remaining.data.length === 0 }
+}
+
+async function checkpointDelete(openid, deletion, completed) {
+  return db.runTransaction(async (tx) => {
+    const ref = tx.collection(CONTROL).doc(hash(openid))
+    const current = await readDoc(ref)
+    if (!current || current.epoch !== deletion.epoch || current.deleteRequestId !== deletion.requestId) throw new Error('DELETE_VERSION_CHANGED')
+    if (!current.deleting) return current
+    const done = [...new Set([...(current.deleteCompletedCollections || []), ...completed])]
+    const next = { ...current, deleteCompletedCollections: done, deleting: !COLLECTIONS.every(name => done.includes(name)), revision: (current.revision || 0) + 1 }
+    await ref.update({ data: { deleteCompletedCollections: done, deleting: next.deleting, revision: next.revision } })
+    return next
+  })
 }
 
 async function loadOwnedData(openid, requestedCollections) {
@@ -108,7 +116,7 @@ async function syncDocuments(openid, event) {
       const current = await readDoc(ref)
       if (current && current._openid !== openid) throw new Error('FORBIDDEN')
       if (current && (time(current) > time(raw) || (time(current) === time(raw) && current._deleted && !raw._deleted))) return
-      const payload = { ...raw, localId, _openid: openid, syncedAt: Date.now() }
+      const payload = { ...raw, localId, _openid: openid, syncEpoch: event.epoch, syncedAt: Date.now() }
       delete payload._id; delete payload.localPhotoPaths
       await ref.set({ data: payload })
       // Writing the same control document serializes sync commits with deletion.
@@ -124,7 +132,7 @@ async function beginDelete(openid, requestId) {
     const current = await readDoc(ref) || { epoch: 0, revision: 0 }
     if (current.deleteRequestId === requestId) return current
     if (current.deleting) return current
-    const next = { epoch: current.epoch + 1, deleting: true, deleteRequestId: requestId, revision: (current.revision || 0) + 1 }
+    const next = { epoch: current.epoch + 1, deleting: true, deleteRequestId: requestId, deleteCompletedCollections: [], revision: (current.revision || 0) + 1 }
     await ref.set({ data: next }); return next
   })
   const footprints = meta.deleting ? await getAllOwned('footprints', openid) : []
@@ -132,33 +140,36 @@ async function beginDelete(openid, requestId) {
   return protocol({ code: 0, epoch: meta.epoch, requestId: meta.deleteRequestId, deleted: !meta.deleting, fileIds })
 }
 async function finishDelete(openid, event) {
-  const meta = await control(openid)
+  const startedAt = Date.now()
+  let meta = await control(openid)
   if (event.confirm !== 'DELETE_MY_DATA' || event.requestId !== meta.deleteRequestId || event.epoch !== meta.epoch) throw new Error('INVALID_CONFIRMATION')
   if (!meta.deleting) return protocol({ code: 0, deleted: true, epoch: meta.epoch })
-  const failures = []
-  // Files are deleted through the caller's client SDK before this step.
-  // Never pass user-writable file IDs to an administrative file-delete API.
-  for (const collection of COLLECTIONS) {
-    try { await removeOwned(collection, openid, event) }
-    catch (error) { failures.push({ target: collection, message: error.message || String(error) }) }
+  let groups = 0
+  // File deletion still uses the caller's client SDK before this step.
+  while (meta.deleting && groups < Math.ceil(COLLECTIONS.length / DELETE_COLLECTION_CONCURRENCY) && Date.now() - startedAt < DELETE_BUDGET_MS) {
+    const pending = COLLECTIONS.filter(name => !(meta.deleteCompletedCollections || []).includes(name)).slice(0, DELETE_COLLECTION_CONCURRENCY)
+    const results = await Promise.all(pending.map(async collection => {
+      try { return await removeOwnedCollection(collection, openid, meta.epoch) }
+      catch (error) { return { collection, error: error.message || String(error) } }
+    }))
+    const completed = results.filter(item => item.done).map(item => item.collection)
+    meta = await checkpointDelete(openid, event, completed)
+    groups += 1
+    const failures = results.filter(item => item.error).map(item => ({ target: item.collection, message: item.error }))
+    if (failures.length) return protocol({ code: -1, deleted: false, message: '删除尚未完成，请重试', failures })
+    if (results.some(item => !item.done)) break
   }
-  if (failures.length) return protocol({ code: -1, deleted: false, message: '删除尚未完成，请重试', failures })
-  await db.runTransaction(async (tx) => {
-    const ref = tx.collection(CONTROL).doc(hash(openid))
-    const latest = await readDoc(ref)
-    if (latest.epoch !== event.epoch || latest.deleteRequestId !== event.requestId) throw new Error('DELETE_VERSION_CHANGED')
-    await ref.update({ data: { deleting: false } })
-  })
-  return protocol({ code: 0, deleted: true, epoch: meta.epoch })
+  console.info('deleteAll bulk', { groups, completedCollections: (meta.deleteCompletedCollections || []).length, elapsedMs: Date.now() - startedAt, deleted: !meta.deleting })
+  return protocol({ code: 0, deleted: !meta.deleting, pending: meta.deleting, epoch: meta.epoch })
 }
 exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
   if (!OPENID) throw new Error('UNAUTHENTICATED')
   try {
     if (event.action === 'initialize' && event.confirm === 'CREATE_COLLECTIONS') return protocol(await initializeCollections())
-    const meta = await control(OPENID)
     if (event.action === 'beginDelete') return await beginDelete(OPENID, event.requestId)
     if (event.action === 'deleteAll') return await finishDelete(OPENID, event)
+    const meta = await control(OPENID)
     if (meta.deleting) return protocol({ code: -1, deleting: true, epoch: meta.epoch, message: '个人数据删除尚未完成，请在设置中继续' })
     if (event.action === 'load') {
       const snapshot = await loadOwnedData(OPENID, event.collections)

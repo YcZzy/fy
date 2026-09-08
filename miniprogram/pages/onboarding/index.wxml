@@ -37,13 +37,14 @@
     </view>
 
     <view wx:else class="stage action-stage">
-      <text class="eyebrow">先备下一些选择</text>
-      <view class="stage-title">这是你的初始行动库</view>
-      <view class="hero-subtitle">按刚才的选择排在前面。可以修改、移除或补充，以后也能随时调整。</view>
-      <view class="initial-actions solid-card">
+      <text class="eyebrow">从你想做的事开始</text>
+      <view class="stage-title">你的行动库，由你来写</view>
+      <view class="hero-subtitle">可以现在添加一件想做的事，也可以留空，以后再慢慢记录。</view>
+      <view wx:if="{{previewActions.length}}" class="initial-actions solid-card">
         <view wx:for="{{previewActions}}" wx:key="id" class="initial-action"><view><text>{{item.name}}</text><text>{{item.domainName}} · {{item.minutes}} 分钟</text></view><view><text data-id="{{item.id}}" bindtap="editAction">修改</text><text data-id="{{item.id}}" bindtap="removeAction">移除</text></view></view>
       </view>
-      <button class="secondary-btn add-initial" bindtap="addAction">＋ 补充一个行动</button>
+      <view wx:else class="empty">还没有行动，想好了再添也来得及。</view>
+      <button class="secondary-btn add-initial" bindtap="addAction">＋ 添加一个行动</button>
     </view>
 
     <button wx:if="{{step > 0 && !editing}}" class="ghost-btn" bindtap="back">上一步</button>

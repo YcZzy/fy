@@ -51,6 +51,10 @@ async function test(name, run) {
   wx.showModal = () => {}; repo.ensureState()
   await run(); count += 1; console.log('通过：' + name)
 }
+function addTestAction(overrides = {}) {
+  repo.saveAction({ id: 'test-action', name: '用户添加的行动', domainId: '', minutes: 10, ...overrides })
+  return repo.getState().actions.find(item => item.id === (overrides.id || 'test-action'))
+}
 async function main() {
   await test('R01 本地模式三个主页面完整执行', async () => {
     repo.completeOnboarding([], '')
@@ -58,7 +62,7 @@ async function main() {
   })
   await test('R02 编辑历史足迹保留当前计时', () => {
     repo.addFootprint({ id: 'old', actionId: 'a_song', actionName: 'Old', minutes: 5 })
-    repo.startSession(repo.getState().actions[0], 'timer')
+    repo.startSession(addTestAction(), 'timer')
     const sessionId = repo.getState().activeSession.id
     repo.saveFootprint({ id: 'old', note: 'Edited' })
     assert.equal(repo.getState().activeSession.id, sessionId)
@@ -97,13 +101,13 @@ async function main() {
     assert.equal(p.data.context.minutes, 10); assert.equal(p.data.recommendations.length, 0); assert.equal(p.data.generating, false)
   })
   await test('R08 AI 复用既有行动身份并去重', () => {
-    const state = repo.getState(); const raw = [{ name: state.actions[0].name, domainId: 'health', minutes: 20 }]
+    addTestAction(); const state = repo.getState(); const raw = [{ name: state.actions[0].name, domainId: 'health', minutes: 20 }]
     const a = recommender.normalizeAiRecommendations([...raw, ...raw], state, state.preferences.lastContext)
     const b = recommender.normalizeAiRecommendations(raw, state, state.preferences.lastContext)
     assert.equal(a.length, 1); assert.equal(a[0].id, state.actions[0].id); assert.equal(b[0].id, a[0].id)
   })
   await test('R09 详情保留本次推荐原因', () => {
-    const action = repo.getState().actions[0]
+    const action = addTestAction()
     repo.saveRecommendations([{ ...action, reason: 'Specific context reason' }], 'test', 'rule')
     const p = page('action'); p.onLoad({ id: action.id }); p.load()
     assert.equal(p.data.action.reason, 'Specific context reason')
@@ -141,6 +145,27 @@ async function main() {
     const result = await cloud.deleteAllPersonalData(); repo.deleteAllPersonalData(result.epoch); await sync.flush()
     assert.equal(server.rows('wishes').length, 0); assert.equal(repo.getState().wishes.length, 0)
   })
+  await test('分批删除中断后保留本机数据，重试自动续删到完成', async () => {
+    const server = connect(fixture({ bulkRemoveLimit: 10 })); repo.addWish('keep-local-until-done')
+    for (let index = 0; index < 31; index += 1) await server.seed('actions', { id: 'batch-' + index, _openid: 'user-a' })
+    const originalCall = wx.cloud.callFunction
+    let calls = 0
+    wx.cloud.callFunction = async options => {
+      if (options.data.action === 'deleteAll' && ++calls === 2) throw new Error('simulated timeout')
+      return originalCall(options)
+    }
+    await assert.rejects(cloud.deleteAllPersonalData(), /simulated timeout/)
+    assert.equal(repo.getState().deletionPending, true)
+    assert.equal(repo.getState().wishes[0].text, 'keep-local-until-done')
+    assert.equal(server.rows('actions').length, 21)
+    assert.equal(server.rows('sync_control')[0].deleting, true)
+    wx.cloud.callFunction = originalCall
+    const result = await cloud.deleteAllPersonalData()
+    assert.equal(result.deleted, true); assert.equal(result.epoch, 1)
+    repo.deleteAllPersonalData(result.epoch)
+    assert.equal(repo.getState().deletionPending, false)
+    assert.equal(server.rows('actions').length, 0)
+  })
   await test('在途推送结束后删除，旧请求不能重新出现', async () => {
     const server = connect(); const ready = deferred(), release = deferred(); const originalCall = wx.cloud.callFunction
     wx.cloud.callFunction = async (options) => { if (options.data.action === 'sync') { ready.resolve(); await release.promise } return originalCall(options) }
@@ -167,15 +192,40 @@ async function main() {
     const server = connect(); await server.seed('ai_conversations', { _openid: 'user-a', id: 'old-conversation', localId: 'old-conversation', title: 'History', messages: [], updatedAt: 100 })
     await sync.bootstrap(['conversations']); assert.equal(repo.getState().conversations[0].id, 'old-conversation')
   })
-  await test('新用户没有未经确认的个人计划和愿望', () => { assert.equal(repo.getState().plans.length, 0); assert.equal(repo.getState().wishes.length, 0); assert.ok(repo.getState().actions.length) })
+  await test('新用户和删除后重启均无预设个人数据', async () => {
+    const keys = ['domains', 'actions', 'plans', 'wishes', 'footprints', 'reviews', 'conversations']
+    const assertEmpty = () => keys.forEach(key => assert.deepEqual(repo.getState()[key], [], key))
+    assertEmpty()
+    const onboarding = page('onboarding'); onboarding.onLoad({}); onboarding.refreshPreview()
+    assert.deepEqual(onboarding.data.previewActions, [])
+    onboarding.skip(); assertEmpty()
+    addTestAction(); repo.addWish('主动填写的愿望')
+    repo.deleteAllPersonalData(7); assertEmpty()
+    const restarted = repo.ensureState()
+    assert.equal(restarted.cloudEpoch, 7); assert.deepEqual(restarted.syncQueue, [])
+    assert.equal(restarted.recommendationCache, null)
+    assert.deepEqual(restarted.preferences.selectedInterests, [])
+    const server = connect(); await sync.flush()
+    assert.equal(server.rows('actions').length, 0); assert.equal(server.rows('life_domains').length, 0)
+  })
+  await test('空数据下可创建首个行动和计划且不会生成默认板块', () => {
+    const action = page('action-editor'); action.onLoad({})
+    assert.equal(repo.getState().actions.length, 0)
+    assert.equal(action.data.action.domainId, '')
+    action.onName({ detail: { value: '第一件想做的事' } }); action.save()
+    const plan = page('plan'); plan.onLoad({}); plan.onName({ detail: { value: '第一个计划' } }); plan.save()
+    assert.equal(repo.getState().actions.length, 1); assert.equal(repo.getState().plans.length, 1)
+    assert.equal(repo.getState().domains.length, 0)
+  })
   await test('新计划一次流程可关联行动，重复保存不重复创建', () => {
+    addTestAction()
     const p = page('plan'); p.onLoad({}); p.onName({ detail: { value: '整理体验' } })
     assert.ok(p.data.actions.length)
     p.toggleActionLink({ currentTarget: { dataset: { id: p.data.actions[0].id } } }); p.save(); p.save()
     assert.equal(repo.getState().plans.length, 1); assert.equal(repo.getState().plans[0].actionIds.length, 1); assert.equal(p.data.isNew, false)
   })
   await test('计时进入记录页被冻结；保存只结束对应会话', async () => {
-    const action = repo.getState().actions[0]; repo.startSession(action, 'timer')
+    const action = addTestAction(); repo.startSession(action, 'timer')
     const p = page('record'); p.onLoad({ actionId: action.id, mode: 'timer' })
     assert.equal(repo.getState().activeSession.status, 'paused')
     await p.save(); await p.save()
@@ -183,7 +233,7 @@ async function main() {
   })
   await test('历史足迹保留当时名称，补记可选择过去日期', async () => {
     repo.addFootprint({ id: 'old', actionId: 'a_song', actionName: 'Old name', domainId: 'rest', domainName: 'Rest', minutes: null })
-    repo.saveAction({ ...repo.getState().actions.find((item) => item.id === 'a_song'), name: 'New name' })
+    addTestAction({ id: 'a_song', name: 'New name' })
     const p = page('record'); p.onLoad({ footprintId: 'old', actionId: 'a_song', mode: 'edit' })
     assert.equal(p.data.action.name, 'Old name'); p.onDate({ detail: { value: '2026-01-02' } }); await p.save()
     assert.equal(require('../miniprogram/services/format').dateKey(repo.getState().footprints[0].createdAt), '2026-01-02')

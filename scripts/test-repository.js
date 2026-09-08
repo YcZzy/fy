@@ -19,7 +19,9 @@ require.cache[syncPath] = {
 delete require.cache[repositoryPath]
 const repository = require(repositoryPath)
 
-repository.ensureState()
+const initial = repository.ensureState()
+const personalKeys = ['domains', 'actions', 'plans', 'wishes', 'footprints', 'reviews', 'conversations']
+if (personalKeys.some(key => initial[key].length)) throw new Error('首次初始化必须为空')
 repository.addWish('想看看秋天的海')
 repository.saveReview({ period: 'week', content: '这一周有一些真实发生过的生活。' })
 repository.startSession({ id: 'a_test', name: '出去走走', minutes: 10 }, 'direct')
@@ -74,10 +76,16 @@ storage.set('feng_yue_state_v1', {
 })
 const migrated = repository.ensureState()
 if (migrated.version !== 4 || !migrated.plans.find((item) => item.id === 'p_legacy').actionIds.includes('a_legacy')) throw new Error('旧计划行动关联迁移失败')
+if (migrated.actions.length !== 1 || migrated.domains.length) throw new Error('版本迁移不能补入默认行动或板块')
 if (Object.prototype.hasOwnProperty.call(migrated.actions.find((item) => item.id === 'a_legacy'), 'planId')) throw new Error('迁移后不应残留行动 planId')
 
 storage.set('feng_yue_state_v1', 1)
 const recovered = repository.ensureState()
 if (!recovered || typeof recovered !== 'object' || recovered.version !== 4) throw new Error('损坏状态恢复失败')
+
+if (personalKeys.some(key => recovered[key].length)) throw new Error('损坏状态恢复必须为空')
+repository.deleteAllPersonalData(3)
+if (personalKeys.some(key => repository.getState()[key].length)) throw new Error('删除后不能重建默认数据')
+if (repository.getState().syncQueue.length) throw new Error('删除后的空数据不能自动回写云端')
 
 console.log('仓储回归通过：增量同步、云端恢复、回望保存及损坏状态恢复。')

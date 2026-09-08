@@ -126,7 +126,7 @@ function normalizeAiRecommendations(rawItems, state, context) {
   return rawItems.filter((item) => item && typeof item.name === 'string' && item.name.trim().length >= 2).map((item) => {
     const name = item.name.trim().slice(0, 30)
     const existing = state.actions.find((value) => value.id === item.actionId || value.id === item.id) || state.actions.find((value) => value.name.trim().toLowerCase() === name.toLowerCase())
-    const domainId = existing ? existing.domainId : (domainIds.has(item.domainId) ? item.domainId : 'daily')
+    const domainId = existing ? existing.domainId : (domainIds.has(item.domainId) ? item.domainId : '')
     const plan = state.plans.find((value) => value.id === item.planId && !['ended', 'paused'].includes(value.status) && value.domainId === domainId)
     const action = existing ? { ...existing } : {
       id: uid('ai_action'), name, domainId,

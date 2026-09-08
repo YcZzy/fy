@@ -22,9 +22,9 @@ Page({
     if (!existing && ['timer', 'direct'].includes(this.mode) && !session) { wx.showToast({ title: '这件事已处理，请从足迹中查看', icon: 'none' }); wx.navigateBack(); return }
     if (this.mode === 'timer' && session && session.status === 'running') { repository.pauseSession(); state = repository.getState(); session = state.activeSession }
     this.sessionId = session ? session.id : ''
-    const domains = state.domains.filter((item) => !item.hidden)
+    const domains = [{ id: '', name: '未分类' }, ...state.domains.filter((item) => !item.hidden)]
     const raw = existing ? { id: existing.actionId, name: existing.actionName, domainId: existing.domainId, domainName: existing.domainName, planId: existing.planId || '', planName: existing.planName || '', minutes: existing.minutes } :
-      (session && session.actionSnapshot) || state.actions.find((item) => item.id === options.actionId) || { id: '', name: '', domainId: (domains[0] || {}).id || 'daily', minutes: null }
+      (session && session.actionSnapshot) || state.actions.find((item) => item.id === options.actionId) || { id: '', name: '', domainId: '', minutes: null }
     const domain = state.domains.find((item) => item.id === raw.domainId)
     const planId = raw.planId || options.planId || ''
     const plan = state.plans.find((item) => item.id === planId)
@@ -41,7 +41,7 @@ Page({
   onUnload() { this.disposed = true; form.saved(this) },
   change(values) { this.setData(values); form.changed(this) },
   onName(event) { this.change({ 'action.name': event.detail.value }) },
-  onDomain(event) { const index = Number(event.detail.value); const domain = this.data.domains[index]; this.change({ domainIndex: index, 'action.domainId': domain.id, 'action.domainName': domain.name }) },
+  onDomain(event) { const index = Number(event.detail.value); const domain = this.data.domains[index]; if (!domain) return; this.change({ domainIndex: index, 'action.domainId': domain.id, 'action.domainName': domain.name }) },
   onDate(event) { this.change({ recordDate: event.detail.value }) },
   toggleDetails() { this.setData({ expanded: !this.data.expanded }) },
   selectDuration(event) { const value = event.currentTarget.dataset.value === 'none' ? null : Number(event.currentTarget.dataset.value); this.change({ minutes: value, customMinutes: value === null ? '' : String(value) }) },

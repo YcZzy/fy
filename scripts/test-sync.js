@@ -11,7 +11,8 @@ const remote = {
   id: 'a_walk',
   name: '散步',
   environments: ['outdoor', 'any'],
-  syncedAt: 100
+  syncedAt: 100,
+  syncEpoch: 1
 }
 const unchanged = {
   name: '散步',

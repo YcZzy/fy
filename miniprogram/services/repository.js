@@ -1,4 +1,4 @@
-const { createInitialState, DOMAINS, ACTIONS } = require('../data/defaults')
+const { createInitialState } = require('../data/defaults')
 const { uid } = require('./format')
 
 const STORAGE_KEY = 'feng_yue_state_v1'
@@ -56,19 +56,13 @@ function changedCollections(before, after) {
 function normalizeState(state) {
   const initial = createInitialState()
   let changed = false
-  const upgrading = state.version !== STATE_VERSION
   const setDefault = (key, value) => {
     if (state[key] !== undefined && state[key] !== null) return
     state[key] = value
     changed = true
   }
-  const missingDomains = upgrading ? DOMAINS.filter((item) => !(state.domains || []).some((existing) => existing.id === item.id)) : []
-  const missingActions = upgrading ? ACTIONS.filter((item) => !(state.actions || []).some((existing) => existing.id === item.id)) : []
-  state.domains = [...(state.domains || []), ...missingDomains]
-  state.actions = [...(state.actions || []), ...missingActions]
-  if (missingDomains.length || missingActions.length) changed = true
   setDefault('preferences', initial.preferences)
-  ;['plans', 'wishes', 'footprints', 'reviews', 'conversations'].forEach((key) => setDefault(key, []))
+  ;['domains', 'actions', 'plans', 'wishes', 'footprints', 'reviews', 'conversations'].forEach((key) => setDefault(key, []))
   setDefault('declinedActions', state.declinedActionIds || [])
   setDefault('pendingFileDeletes', [])
   setDefault('syncQueue', [])

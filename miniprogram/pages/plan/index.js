@@ -8,7 +8,7 @@ const statistics = require('../../services/statistics')
 const STATUSES = [{ value: 'want', label: '想做' }, { value: 'active', label: '进行中' }, { value: 'paused', label: '暂停' }, { value: 'ended', label: '已结束' }]
 
 Page({
-  data: { plan: { id: '', name: '', why: '', status: 'want', focused: false, importantDate: '', domainId: 'daily', actionIds: [] }, statuses: STATUSES, domains: [], domainIndex: 0, domainName: '', isNew: true, actions: [], footprints: [], stats: null, theme: 'now', dirty: false },
+  data: { plan: { id: '', name: '', why: '', status: 'want', focused: false, importantDate: '', domainId: '', actionIds: [] }, statuses: STATUSES, domains: [], domainIndex: 0, domainName: '', isNew: true, actions: [], footprints: [], stats: null, theme: 'now', dirty: false },
   onLoad(options) {
     this.token = repository.dataToken()
     const theme = themeService.fromOptions(options)
@@ -21,8 +21,8 @@ Page({
     try { draft = options.draft ? JSON.parse(decodeURIComponent(options.draft)) : null } catch (error) { console.warn('计划草稿解析失败', error) }
     if (options.id && !plan) { wx.showToast({ title: '这个计划已不存在', icon: 'none' }); wx.navigateBack(); return }
     this.draftConversationId = draft && draft.conversationId
-    if (!plan) plan = { id: draft && draft.id || format.uid('p'), name: draft ? draft.name : (options.wish ? decodeURIComponent(options.wish) : ''), why: draft ? (draft.why || '') : '', status: 'want', focused: false, importantDate: '', domainId: draft ? (draft.domainId || 'daily') : 'daily', actionIds: [] }
-    const domains = state.domains.filter((item) => !item.hidden)
+    if (!plan) plan = { id: draft && draft.id || format.uid('p'), name: draft ? draft.name : (options.wish ? decodeURIComponent(options.wish) : ''), why: draft ? (draft.why || '') : '', status: 'want', focused: false, importantDate: '', domainId: draft ? (draft.domainId || '') : '', actionIds: [] }
+    const domains = [{ id: '', name: '未分类' }, ...state.domains.filter((item) => !item.hidden)]
     const domainIndex = Math.max(0, domains.findIndex((item) => item.id === plan.domainId))
     this.setData({ plan: { ...plan, actionIds: plan.actionIds || [] }, domains, domainIndex, domainName: (domains[domainIndex] || {}).name || '生活', isNew: !options.id, theme }, () => this.refreshRelated())
   },
@@ -72,6 +72,7 @@ Page({
   onDomain(event) {
     const domainIndex = Number(event.detail.value)
     const domain = this.data.domains[domainIndex]
+    if (!domain) return
     const state = repository.getState()
     const compatibleIds = (this.data.plan.actionIds || []).filter((id) => {
       const action = state.actions.find((item) => item.id === id)

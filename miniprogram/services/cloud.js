@@ -125,9 +125,15 @@ function deleteAllPersonalData() {
     const fresh = repository.getState()
     const files = [...new Set([...(value.fileIds || []), ...fresh.pendingFileDeletes, ...fresh.footprints.reduce((all, item) => all.concat(item.photoFileIds || []), [])])]
     await deleteCloudFiles(files)
-    const response = await wx.cloud.callFunction({ name: 'dataManager', data: { action: 'deleteAll', confirm: 'DELETE_MY_DATA', requestId: value.requestId, epoch: value.epoch } })
-    if (!response.result || response.result.code !== 0 || !response.result.deleted) throw new Error((response.result && response.result.message) || '云端删除尚未完成')
-    return response.result
+    const startedAt = Date.now()
+    for (let attempt = 0; attempt < 100 && Date.now() - startedAt < 120000; attempt += 1) {
+      const response = await wx.cloud.callFunction({ name: 'dataManager', data: { action: 'deleteAll', confirm: 'DELETE_MY_DATA', requestId: value.requestId, epoch: value.epoch } })
+      const result = response.result
+      if (!result || result.protocol !== 2 || result.code !== 0 || result.epoch !== value.epoch) throw new Error((result && result.message) || '云端删除尚未完成')
+      if (result.deleted === true) return result
+      if (result.pending !== true) throw new Error(result.message || '云端删除尚未完成')
+    }
+    throw new Error('云端正在分批删除，进度已保存，请点击继续删除')
   })().finally(() => { deleteWork = null })
   return deleteWork
 }

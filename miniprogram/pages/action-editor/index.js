@@ -20,9 +20,9 @@ Page({
     this.draftConversationId = draft && draft.conversationId
     const requestedPlanId = (draft && draft.planId) || options.planId || ''
     const requestedPlan = state.plans.find((item) => item.id === requestedPlanId)
-    const domainId = existing ? existing.domainId : ((requestedPlan && requestedPlan.domainId) || options.domainId || (draft && draft.domainId) || 'daily')
+    const domainId = existing ? existing.domainId : ((requestedPlan && requestedPlan.domainId) || options.domainId || (draft && draft.domainId) || '')
     const action = existing ? { ...existing } : { id: draft && draft.id || format.uid('a'), name: draft ? (draft.name || '') : '', domainId, minutes: draft ? Math.max(1, Number(draft.minutes) || 30) : 30, energy: ['low','medium','high'], environments: ['any'], preparation: draft ? (draft.preparation || '') : '', source: draft ? 'ai' : 'user' }
-    const domains = state.domains.filter((item) => !item.hidden)
+    const domains = [{ id: '', name: '未分类' }, ...state.domains.filter((item) => !item.hidden)]
     const linkedPlanIds = existing ? state.plans.filter((item) => (item.actionIds || []).includes(existing.id)).map((item) => item.id) : []
     const planMap = this.toMap([...linkedPlanIds, requestedPlanId].filter(Boolean))
     const plans = state.plans.filter((item) => item.status !== 'ended' && item.domainId === action.domainId)
@@ -34,7 +34,9 @@ Page({
   onPreparation(event) { form.changed(this); this.setData({ 'action.preparation': event.detail.value }) },
   onDomain(event) { form.changed(this);
     const index = Number(event.detail.value)
-    const domainId = this.data.domains[index].id
+    const domain = this.data.domains[index]
+    if (!domain) return
+    const domainId = domain.id
     const state = repository.getState()
     const plans = state.plans.filter((item) => item.status !== 'ended' && item.domainId === domainId)
     const allowed = new Set(plans.map((item) => item.id))

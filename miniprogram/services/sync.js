@@ -61,6 +61,7 @@ function clean(doc) {
   const value = { ...doc }
   delete value._id
   delete value._openid
+  delete value.syncEpoch
   return value
 }
 function recordTime(item) {
@@ -131,7 +132,7 @@ function normalized(value) {
   if (Array.isArray(value)) return value.map(normalized)
   if (!value || typeof value !== 'object') return value
   return Object.keys(value).sort().reduce((result, key) => {
-    if (!['_id', '_openid', 'syncedAt'].includes(key)) result[key] = normalized(value[key])
+    if (!['_id', '_openid', 'syncedAt', 'syncEpoch'].includes(key)) result[key] = normalized(value[key])
     return result
   }, {})
 }

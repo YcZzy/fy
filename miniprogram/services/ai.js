@@ -67,7 +67,7 @@ async function review(footprints, rangeLabel) {
 function normalizeDraft(raw, summary = {}) {
   if (!raw || !['action', 'plan'].includes(raw.type) || typeof raw.name !== 'string' || !raw.name.trim()) return null
   const domains = summary.domains || []
-  const domainId = domains.some((item) => item.id === raw.domainId) ? raw.domainId : 'daily'
+  const domainId = domains.some((item) => item.id === raw.domainId) ? raw.domainId : ''
   const plan = (summary.plans || []).find((item) => item.id === raw.planId && item.domainId === domainId)
   return { type: raw.type, name: raw.name.trim().slice(0, 30), domainId, minutes: Math.min(720, Math.max(1, Math.round(Number(raw.minutes) || 30))), why: String(raw.why || '').slice(0, 180), preparation: String(raw.preparation || '不需要额外准备').slice(0, 60), planId: plan ? plan.id : '', source: 'ai' }
 }
