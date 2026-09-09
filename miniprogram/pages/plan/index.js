@@ -4,11 +4,12 @@ const recommender = require('../../services/recommender')
 const themeService = require('../../services/theme')
 const form = require('../../services/form')
 const statistics = require('../../services/statistics')
+const domainCatalog = require('../../data/domains')
 
 const STATUSES = [{ value: 'want', label: '想做' }, { value: 'active', label: '进行中' }, { value: 'paused', label: '暂停' }, { value: 'ended', label: '已结束' }]
 
 Page({
-  data: { plan: { id: '', name: '', why: '', status: 'want', focused: false, importantDate: '', domainId: '', actionIds: [] }, statuses: STATUSES, domains: [], domainIndex: 0, domainName: '', isNew: true, actions: [], footprints: [], stats: null, theme: 'now', dirty: false },
+  data: { plan: { id: '', name: '', why: '', status: 'want', focused: false, importantDate: '', domainId: '', actionIds: [] }, statuses: STATUSES, domains: [], domainIndex: 0, domainName: '', isNew: true, actions: [], draftActions: [], footprints: [], stats: null, theme: 'now', dirty: false },
   onLoad(options) {
     this.token = repository.dataToken()
     const theme = themeService.fromOptions(options)
@@ -22,9 +23,10 @@ Page({
     if (options.id && !plan) { wx.showToast({ title: '这个计划已不存在', icon: 'none' }); wx.navigateBack(); return }
     this.draftConversationId = draft && draft.conversationId
     if (!plan) plan = { id: draft && draft.id || format.uid('p'), name: draft ? draft.name : (options.wish ? decodeURIComponent(options.wish) : ''), why: draft ? (draft.why || '') : '', status: 'want', focused: false, importantDate: '', domainId: draft ? (draft.domainId || '') : '', actionIds: [] }
-    const domains = [{ id: '', name: '未分类' }, ...state.domains.filter((item) => !item.hidden)]
+    const domains = [{ id: '', name: '未分类' }, ...domainCatalog.allDomains(state.domains)]
     const domainIndex = Math.max(0, domains.findIndex((item) => item.id === plan.domainId))
-    this.setData({ plan: { ...plan, actionIds: plan.actionIds || [] }, domains, domainIndex, domainName: (domains[domainIndex] || {}).name || '生活', isNew: !options.id, theme }, () => this.refreshRelated())
+    const draftActions = !options.id && draft && Array.isArray(draft.actions) ? draft.actions.map((item, index) => ({ ...item, draftKey: `draft_${index}`, included: true })) : []
+    this.setData({ plan: { ...plan, actionIds: plan.actionIds || [] }, domains, domainIndex, domainName: (domains[domainIndex] || {}).name || '生活', draftActions, isNew: !options.id, theme }, () => this.refreshRelated())
   },
   onShow() {
     if (!form.guard(this)) return
@@ -43,7 +45,7 @@ Page({
     const context = state.preferences.lastContext
     const linkedIds = new Set(this.data.plan.actionIds || [])
     const actions = state.actions.filter((item) => !item.hidden && item.domainId === this.data.plan.domainId)
-      .map((item) => ({ ...item, linked: linkedIds.has(item.id), suitableNow: recommender.isEligible(item, state, context), domainName: (state.domains.find((domain) => domain.id === item.domainId) || {}).name || '生活' }))
+      .map((item) => ({ ...item, linked: linkedIds.has(item.id), suitableNow: recommender.isEligible(item, state, context), domainName: (domainCatalog.findDomain(state.domains, item.domainId) || {}).name || '生活' }))
       .sort((left, right) => Number(right.linked) - Number(left.linked) || Number(right.suitableNow) - Number(left.suitableNow))
     const footprints = state.footprints.filter((item) => item.planId === planId).sort((a, b) => b.createdAt - a.createdAt).slice(0, 5).map((item) => ({ ...item, dateLabel: format.dateLabel(item.createdAt), durationLabel: format.duration(item.minutes) }))
     const allFootprints = state.footprints.filter((item) => item.planId === planId)
@@ -68,6 +70,11 @@ Page({
   onDate(event) { this.change({ 'plan.importantDate': event.detail.value }) },
   clearDate() { this.change({ 'plan.importantDate': '' }) },
   change(values, callback) { this.setData({ ...values, dirty: true }, callback); form.changed(this) },
+  toggleDraftAction(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const draftActions = this.data.draftActions.map((item, itemIndex) => itemIndex === index ? { ...item, included: !item.included } : item)
+    this.change({ draftActions })
+  },
   onUnload() { form.saved(this) },
   onDomain(event) {
     const domainIndex = Number(event.detail.value)
@@ -87,7 +94,13 @@ Page({
     const plan = { ...this.data.plan, name: this.data.plan.name.trim(), why: this.data.plan.why.trim() }
     if (!plan.name) { wx.showToast({ title: '给计划起个名字吧', icon: 'none' }); return null }
     if (plan.status === 'ended') { plan.focused = false; plan.focusedAt = 0 }
-    repository.savePlan(plan)
+    if (this.data.isNew && this.data.draftActions.length) {
+      const actions = this.data.draftActions.filter((item) => item.included).map(({ included, draftKey, ...item }) => ({ ...item, domainId: plan.domainId }))
+      repository.saveOrganizedDraft({ type: 'plan', ...plan, actions })
+      const stored = repository.getState().plans.find((item) => item.id === plan.id)
+      if (stored) Object.assign(plan, stored)
+      this.setData({ draftActions: [] })
+    } else repository.savePlan(plan)
     if (this.wishId) { repository.deleteWish(this.wishId); this.wishId = '' }
     if (this.draftConversationId) {
       repository.update((state) => { const item = state.conversations.find((value) => value.id === this.draftConversationId); if (item && item.draft && item.draft.id === plan.id) { item.draft = null; item.updatedAt = Date.now() } })

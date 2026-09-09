@@ -5,6 +5,7 @@ const format = require('../../services/format')
 const cloud = require('../../services/cloud')
 const sync = require('../../services/sync')
 const themeService = require('../../services/theme')
+const domainCatalog = require('../../data/domains')
 
 const TIME_OPTIONS = [{ label: '10 分钟', value: 10 }, { label: '30 分钟', value: 30 }, { label: '1 小时', value: 60 }, { label: '2 小时', value: 120 }, { label: '半天', value: 240 }, { label: '自定义', value: -1 }]
 const ENERGY_OPTIONS = [{ label: '很累', value: 'low' }, { label: '一般', value: 'medium' }, { label: '状态不错', value: 'high' }]
@@ -15,9 +16,10 @@ Page({
     greeting: '', timeOptions: TIME_OPTIONS, energyOptions: ENERGY_OPTIONS, envOptions: ENV_OPTIONS,
     context: { minutes: 30, energy: 'medium', environment: 'any', note: '', locationSummary: '' },
     continueActions: [], recommendations: [], generating: false, recommendationSource: '', activeSession: null, activeElapsed: '',
-    pendingAction: null, hasGenerated: false, customTime: false
+    pendingAction: null, hasGenerated: false, customTime: false,
+    thoughtInput: '', organizingThought: false, thoughtDraft: null, thoughtSavedTarget: null
   },
-  onLoad() { this.timer = null },
+  onLoad() { this.timer = null; this.token = repository.dataToken() },
   async onShow() {
     this.visible = true
     const tabBar = typeof this.getTabBar === 'function' && this.getTabBar()
@@ -28,6 +30,12 @@ Page({
       if (!this.visible) return
     }
     const state = repository.getState()
+    if (this.editingThoughtTarget) {
+      const target = this.editingThoughtTarget
+      const saved = target.type === 'plan' ? state.plans.some((item) => item.id === target.id) : state.actions.some((item) => item.id === target.id)
+      if (saved) this.setData({ thoughtInput: '', thoughtDraft: null, thoughtSavedTarget: target })
+      this.editingThoughtTarget = null
+    }
     if (!state.preferences.onboardingComplete) { wx.redirectTo({ url: '/pages/onboarding/index' }); return }
     this.refresh(state)
     sync.bootstrap(['preferences', 'domains', 'actions', 'plans', 'footprints'])
@@ -37,7 +45,7 @@ Page({
     if (this.shouldPromptReminder(state.activeSession)) { this.promptActiveReminder(); return }
     this.maybePromptWeeklyReview()
   },
-  onHide() { this.visible = false; this.requestId = (this.requestId || 0) + 1; this.setData({ generating: false }); this.clearTicker() },
+  onHide() { this.visible = false; this.requestId = (this.requestId || 0) + 1; this.thoughtRequestId = (this.thoughtRequestId || 0) + 1; this.setData({ generating: false, organizingThought: false }); this.clearTicker() },
   onUnload() { this.onHide() },
   refresh(state = repository.getState()) {
     if (recommender.contextKey(this.data.context) !== recommender.contextKey(state.preferences.lastContext)) {
@@ -67,12 +75,75 @@ Page({
         const action = state.actions.find((item) => item.id === actionId && !item.hidden && item.domainId === plan.domainId)
         if (!action) return
         seen.add(actionId)
-        const domain = state.domains.find((item) => item.id === action.domainId)
+        const domain = domainCatalog.findDomain(state.domains, action.domainId)
         continueActions.push({ ...action, planId: plan.id, planName: plan.name, planOrder, suitableNow: recommender.isEligible(action, state, context), domainName: (domain && domain.name) || '生活', domainColor: (domain && domain.color) || '#A87562', duration: format.duration(action.minutes) })
       })
     })
     continueActions.sort((left, right) => Number(right.suitableNow) - Number(left.suitableNow) || left.planOrder - right.planOrder || Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
     return continueActions.slice(0, 3)
+  },
+  onThoughtInput(event) {
+    this.setData({ thoughtInput: event.detail.value, thoughtDraft: null, thoughtSavedTarget: null })
+  },
+  keepThought() {
+    const text = this.data.thoughtInput.trim()
+    if (!text) { wx.showToast({ title: '先写下一件想做的事', icon: 'none' }); return }
+    repository.addWish(text)
+    this.setData({ thoughtInput: '', thoughtDraft: null, thoughtSavedTarget: null })
+    wx.showToast({ title: '已记入想做', icon: 'success' })
+  },
+  async organizeThought() {
+    const text = this.data.thoughtInput.trim()
+    if (!text || this.data.organizingThought) {
+      if (!text) wx.showToast({ title: '先写下一件想做的事', icon: 'none' })
+      return
+    }
+    const state = repository.getState()
+    const requestId = this.thoughtRequestId = (this.thoughtRequestId || 0) + 1
+    const token = repository.dataToken()
+    const current = () => requestId === this.thoughtRequestId && repository.canApply(token) && this.data.thoughtInput.trim() === text
+    this.setData({ organizingThought: true, thoughtDraft: null, thoughtSavedTarget: null })
+    try {
+      const result = await ai.organizeThought(text, state)
+      if (!current()) return
+      const domain = domainCatalog.findDomain(state.domains, result.draft.domainId)
+      const actions = (result.draft.actions || []).map((item, index) => ({ ...item, draftKey: `draft_${index}`, included: true }))
+      this.setData({ thoughtDraft: { ...result.draft, domainName: domain ? domain.name : '未分类', actions } })
+    } catch (error) {
+      if (!current()) return
+      console.warn('想法整理暂不可用', error)
+      wx.showToast({ title: '暂时无法整理，可以先记下来', icon: 'none', duration: 2600 })
+    } finally { if (current()) this.setData({ organizingThought: false }) }
+  },
+  toggleThoughtAction(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const actions = (this.data.thoughtDraft.actions || []).map((item, itemIndex) => itemIndex === index ? { ...item, included: !item.included } : item)
+    this.setData({ 'thoughtDraft.actions': actions })
+  },
+  discardThoughtDraft() { this.setData({ thoughtDraft: null }) },
+  editThoughtDraft() {
+    const draft = this.data.thoughtDraft
+    if (!draft) return
+    const value = { ...draft, id: draft.id || format.uid(draft.type === 'plan' ? 'p' : 'a'), actions: (draft.actions || []).filter((item) => item.included).map(({ included, draftKey, ...item }) => item) }
+    delete value.domainName
+    this.editingThoughtTarget = { type: draft.type, id: value.id }
+    const page = draft.type === 'plan' ? 'plan' : 'action-editor'
+    wx.navigateTo({ url: themeService.withTheme(`/pages/${page}/index?draft=${encodeURIComponent(JSON.stringify(value))}`, 'now') })
+  },
+  saveThoughtDraft() {
+    const draft = this.data.thoughtDraft
+    if (!draft || !repository.canApply(this.token)) return
+    const value = { ...draft, actions: (draft.actions || []).filter((item) => item.included).map(({ included, draftKey, ...item }) => item) }
+    delete value.domainName
+    const target = repository.saveOrganizedDraft(value)
+    this.setData({ thoughtInput: '', thoughtDraft: null, thoughtSavedTarget: target })
+    wx.showToast({ title: draft.type === 'plan' ? '计划已保存' : '行动已保存', icon: 'success' })
+  },
+  openThoughtSaved() {
+    const target = this.data.thoughtSavedTarget
+    if (!target) return
+    const page = target.type === 'plan' ? 'plan' : 'action'
+    wx.navigateTo({ url: themeService.withTheme(`/pages/${page}/index?id=${target.id}`, 'now') })
   },
   selectTime(event) {
     const value = Number(event.currentTarget.dataset.value)
@@ -131,7 +202,7 @@ Page({
     const state = repository.getState()
     const replacement = state.actions.find((item) => item.id !== id && item.domainId === current.domainId && recommender.isEligible(item, state, this.data.context) && !this.data.recommendations.some((shown) => shown.id === item.id))
     if (!replacement) { wx.showToast({ title: '暂时没有更相近的选择', icon: 'none' }); return }
-    const domain = state.domains.find((item) => item.id === replacement.domainId) || { name: '生活', color: '#75806B' }
+    const domain = domainCatalog.findDomain(state.domains, replacement.domainId) || { name: '生活', color: '#75806B' }
     const plan = state.plans.find((value) => value.focused && value.status !== 'ended' && (value.actionIds || []).includes(replacement.id)) || state.plans.find((value) => (value.actionIds || []).includes(replacement.id))
     const item = { ...replacement, planId: plan ? plan.id : '', domainName: domain.name, domainColor: domain.color, reason: '换一种相近的方式，也许更合此刻的心意。', planName: plan ? plan.name : '', locationNote: replacement.environments.includes('location') ? '仅提供活动类别，请自行确认具体地点与营业信息。' : '' }
     const recommendations = this.data.recommendations.map((shown) => shown.id === id ? item : shown)
@@ -160,7 +231,7 @@ Page({
       const items = recommender.recommend(state, context)
       repository.saveRecommendations(items, key, 'rule')
       this.setData({ recommendations: items, recommendationSource: 'rule', hasGenerated: true })
-      wx.showToast({ title: '风暂时没有回音，先看看这些', icon: 'none', duration: 2600 })
+      wx.showToast({ title: items.length ? '风暂时没有回音，先看看这些' : '暂时没有建议，可以写下想做的事', icon: 'none', duration: 2600 })
     } finally { if (current()) this.setData({ generating: false }) }
   },
   swapGroup() {

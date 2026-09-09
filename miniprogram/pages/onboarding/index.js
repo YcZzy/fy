@@ -1,4 +1,5 @@
 const repository = require('../../services/repository')
+const domainCatalog = require('../../data/domains')
 
 const INTERESTS = ['游戏', '短剧影视', '短视频', '健身', '散步', '外语', '考证', '考公', '旅行', '城市探索', '社交', '阅读', '创作', '什么也不做']
 const INTEREST_DOMAINS = {
@@ -48,7 +49,7 @@ Page({
     const actions = state.actions.filter((item) => !item.hidden)
     const preferred = selectedDomains.size ? actions.filter((item) => selectedDomains.has(item.domainId)) : actions
     const previewActions = [...preferred, ...actions.filter((item) => !preferred.some((value) => value.id === item.id))].slice(0, 8)
-      .map((item) => ({ ...item, domainName: (state.domains.find((domain) => domain.id === item.domainId) || {}).name || '生活' }))
+      .map((item) => ({ ...item, domainName: (domainCatalog.findDomain(state.domains, item.domainId) || {}).name || '生活' }))
     this.setData({ previewActions })
   },
   editAction(event) { wx.navigateTo({ url: `/pages/action-editor/index?id=${event.currentTarget.dataset.id}` }) },

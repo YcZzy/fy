@@ -2,6 +2,7 @@ const repository = require('../../services/repository')
 const themeService = require('../../services/theme')
 const format = require('../../services/format')
 const form = require('../../services/form')
+const domainCatalog = require('../../data/domains')
 
 const ENERGIES = [{ value: 'low', label: '很累也能做' }, { value: 'medium', label: '一般状态' }, { value: 'high', label: '状态不错' }]
 const ENVIRONMENTS = [{ value: 'home', label: '在家' }, { value: 'outdoor', label: '户外' }, { value: 'commute', label: '通勤中' }, { value: 'any', label: '不限' }, { value: 'location', label: '附近' }]
@@ -22,7 +23,7 @@ Page({
     const requestedPlan = state.plans.find((item) => item.id === requestedPlanId)
     const domainId = existing ? existing.domainId : ((requestedPlan && requestedPlan.domainId) || options.domainId || (draft && draft.domainId) || '')
     const action = existing ? { ...existing } : { id: draft && draft.id || format.uid('a'), name: draft ? (draft.name || '') : '', domainId, minutes: draft ? Math.max(1, Number(draft.minutes) || 30) : 30, energy: ['low','medium','high'], environments: ['any'], preparation: draft ? (draft.preparation || '') : '', source: draft ? 'ai' : 'user' }
-    const domains = [{ id: '', name: '未分类' }, ...state.domains.filter((item) => !item.hidden)]
+    const domains = [{ id: '', name: '未分类' }, ...domainCatalog.allDomains(state.domains)]
     const linkedPlanIds = existing ? state.plans.filter((item) => (item.actionIds || []).includes(existing.id)).map((item) => item.id) : []
     const planMap = this.toMap([...linkedPlanIds, requestedPlanId].filter(Boolean))
     const plans = state.plans.filter((item) => item.status !== 'ended' && item.domainId === action.domainId)

@@ -4,6 +4,7 @@ const cloud = require('../../services/cloud')
 const sync = require('../../services/sync')
 const themeService = require('../../services/theme')
 const statistics = require('../../services/statistics')
+const domainCatalog = require('../../data/domains')
 
 const FILTERS = [{ label: '全部', value: 'all' }, { label: '进行中', value: 'active' }, { label: '想做', value: 'want' }, { label: '暂停', value: 'paused' }, { label: '已结束', value: 'ended' }]
 
@@ -32,12 +33,12 @@ Page({
       }
     }
     const plans = state.plans.filter((item) => this.data.filter === 'all' || item.status === this.data.filter).map(decorate)
-    const domains = state.domains.filter((item) => !item.hidden).map((domain) => ({ ...domain, actionCount: state.actions.filter((item) => !item.hidden && item.domainId === domain.id).length }))
+    const domains = domainCatalog.usedDomains(state).map((domain) => ({ ...domain, actionCount: state.actions.filter((item) => !item.hidden && item.domainId === domain.id).length }))
     const query = this.data.actionQuery.trim().toLowerCase()
     const actions = state.actions.filter((item) => !item.hidden)
       .filter((item) => !this.data.actionDomainId || item.domainId === this.data.actionDomainId)
       .filter((item) => !query || item.name.toLowerCase().includes(query))
-      .map((action) => ({ ...action, domainName: (state.domains.find((item) => item.id === action.domainId) || {}).name || '生活' }))
+      .map((action) => ({ ...action, domainName: (domainCatalog.findDomain(state.domains, action.domainId) || {}).name || '生活' }))
     const focusedPlans = state.plans
       .filter((item) => item.focused && item.status !== 'ended')
       .sort((left, right) => Number(right.focusedAt || right.updatedAt || right.createdAt || 0) - Number(left.focusedAt || left.updatedAt || left.createdAt || 0))

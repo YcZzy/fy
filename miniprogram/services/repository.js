@@ -277,6 +277,33 @@ function saveAction(action) {
   const existingPlanIds = action.id ? state.plans.filter((plan) => (plan.actionIds || []).includes(action.id)).map((plan) => plan.id) : []
   return saveActionWithPlans(action, legacyPlanId ? [...new Set([...existingPlanIds, legacyPlanId])] : existingPlanIds)
 }
+function saveOrganizedDraft(draft) {
+  if (!draft || !['action', 'plan'].includes(draft.type)) throw new TypeError('INVALID_ORGANIZED_DRAFT')
+  if (draft.type === 'action') {
+    const action = { ...draft, id: draft.id || uid('a'), source: 'ai' }
+    delete action.type
+    delete action.actions
+    delete action.why
+    saveAction(action)
+    return { type: 'action', id: action.id }
+  }
+  const planId = draft.id || uid('p')
+  const created = []
+  update((state) => {
+    ;(draft.actions || []).forEach((item) => {
+      const normalizedName = String(item.name || '').trim().toLowerCase()
+      if (!normalizedName) return
+      let action = state.actions.find((value) => !value.hidden && value.domainId === draft.domainId && value.name.trim().toLowerCase() === normalizedName)
+      if (!action) {
+        action = { energy: ['low', 'medium', 'high'], environments: ['any'], preparation: '不需要额外准备', ...item, id: item.id || uid('a'), domainId: draft.domainId || '', source: 'ai', createdAt: Date.now(), updatedAt: Date.now() }
+        state.actions.unshift(action)
+      }
+      created.push(action.id)
+    })
+    state.plans.unshift({ id: planId, name: String(draft.name || '').trim(), why: String(draft.why || '').trim(), domainId: draft.domainId || '', status: 'want', focused: false, importantDate: '', actionIds: created, source: 'ai', createdAt: Date.now(), updatedAt: Date.now() })
+  })
+  return { type: 'plan', id: planId }
+}
 function setPlanAction(planId, actionId, linked) {
   return update((state) => {
     const plan = state.plans.find((item) => item.id === planId)
@@ -340,6 +367,6 @@ module.exports = {
   saveRecommendations, clearRecommendationCache, incrementRecommendationSwaps, declineAction, startSession, markPendingActionBackgrounded,
   pauseSession, resumeSession, clearSession, resolvePending, reconcileActiveSession,
   addFootprint, saveFootprint, deleteFootprint, queueFileDeletes, savePlan, addWish, deleteWish, saveReview,
-  saveAction, saveActionWithPlans, setPlanAction, hideAction, deleteAction, saveConversation, clearConversations, deleteAllPersonalData, updateReview, deleteReview,
+  saveAction, saveActionWithPlans, saveOrganizedDraft, setPlanAction, hideAction, deleteAction, saveConversation, clearConversations, deleteAllPersonalData, updateReview, deleteReview,
   changedCollections, normalizeState, deletePlan, editWish, dataToken, canApply, markDeletion
 }

@@ -4,6 +4,7 @@ const format = require('../../services/format')
 const sync = require('../../services/sync')
 const cloud = require('../../services/cloud')
 const themeService = require('../../services/theme')
+const domainCatalog = require('../../data/domains')
 const QUICK = ['此刻做什么', '展开一个想法', '帮我建个计划', '回顾最近生活', '想点周末去处', '随便聊聊']
 Page({
   data: { messages: [], input: '', quick: QUICK, history: [], historyLimit: 20, historyCount: 0, showHistory: false, sending: false, draft: null, scrollInto: '', theme: 'now', savedTarget: null },
@@ -59,7 +60,7 @@ Page({
     try {
       const state = repository.getState()
       const contextSummary = {
-        domains: state.domains.filter((item) => !item.hidden).map(({ id, name }) => ({ id, name })),
+        domains: domainCatalog.allDomains(state.domains).map(({ id, name }) => ({ id, name })),
         focusedPlans: state.plans.filter((item) => item.focused && !['ended', 'paused'].includes(item.status)).map(({ id, name }) => ({ id, name })),
         plans: state.plans.filter((item) => item.status !== 'ended').slice(0, 30).map(({ id, name, domainId }) => ({ id, name, domainId })),
         wishes: state.wishes.slice(0, 8).map((item) => item.text),

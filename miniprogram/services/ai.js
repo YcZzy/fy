@@ -1,5 +1,6 @@
 const env = require('../config/env')
 const recommender = require('./recommender')
+const domainCatalog = require('../data/domains')
 
 function isReady() {
   return Boolean(env.CLOUD_ENV_ID && wx.cloud && wx.cloud.extend && wx.cloud.extend.AI)
@@ -29,7 +30,7 @@ async function generate(messages) {
 async function recommend(state, context) {
   const compact = {
     context,
-    domains: state.domains.filter((item) => !item.hidden).map(({ id, name }) => ({ id, name })),
+    domains: domainCatalog.allDomains(state.domains).map(({ id, name }) => ({ id, name })),
     actions: state.actions.filter((item) => recommender.isEligible(item, state, context)).slice(0, 80).map(({ id, name, domainId, minutes, energy, environments, preparation }) => ({ id, name, domainId, minutes, energy, environments, preparation, planIds: state.plans.filter((plan) => (plan.actionIds || []).includes(id)).map((plan) => plan.id) })),
     focusedPlans: state.plans.filter((item) => item.focused && !['ended', 'paused'].includes(item.status)).map(({ id, name, domainId, actionIds }) => ({ id, name, domainId, actionIds: actionIds || [] })),
     recent: state.footprints.slice(0, 8).map(({ actionId, actionName, minutes, feeling }) => ({ actionId, actionName, minutes, feeling })),
@@ -42,6 +43,23 @@ async function recommend(state, context) {
   const items = recommender.normalizeAiRecommendations(parsed.items, state, context)
   if (!items.length) throw new Error('AI_RECOMMENDATION_INVALID')
   return { items, usage: result.usage }
+}
+
+async function organizeThought(text, state) {
+  const thought = String(text || '').trim().slice(0, 500)
+  if (!thought) throw new Error('THOUGHT_REQUIRED')
+  const domains = domainCatalog.allDomains(state.domains).map(({ id, name }) => ({ id, name }))
+  const context = {
+    thought,
+    domains,
+    existingPlans: state.plans.filter((item) => item.status !== 'ended').slice(0, 30).map(({ id, name, domainId }) => ({ id, name, domainId })),
+    existingActions: state.actions.filter((item) => !item.hidden).slice(0, 50).map(({ id, name, domainId }) => ({ id, name, domainId }))
+  }
+  const system = '你负责把用户“想做的事”整理成可确认的草稿。判断它是一次就能开始的 action，还是需要多步展开的 plan。不要把休息、娱乐或日常小事强行升级为计划；信息不足时优先 action。必须从给定 domains 选择最贴切的 domainId，无法判断时返回空字符串。不要评价、说教或虚构用户经历。只返回 JSON：{"type":"action或plan","name":"","domainId":"","why":"","minutes":30,"preparation":"","actions":[{"name":"","minutes":30,"preparation":""}]}。action 的 actions 必须为空；plan 可给 1 至 3 个具体、低门槛的建议行动。'
+  const result = await generate([{ role: 'system', content: system }, { role: 'user', content: JSON.stringify(context) }])
+  const draft = normalizeOrganizedDraft(extractJson(result.text), { domains })
+  if (!draft) throw new Error('AI_ORGANIZATION_INVALID')
+  return { draft, usage: result.usage }
 }
 
 async function chat(messages, contextSummary) {
@@ -71,4 +89,23 @@ function normalizeDraft(raw, summary = {}) {
   const plan = (summary.plans || []).find((item) => item.id === raw.planId && item.domainId === domainId)
   return { type: raw.type, name: raw.name.trim().slice(0, 30), domainId, minutes: Math.min(720, Math.max(1, Math.round(Number(raw.minutes) || 30))), why: String(raw.why || '').slice(0, 180), preparation: String(raw.preparation || '不需要额外准备').slice(0, 60), planId: plan ? plan.id : '', source: 'ai' }
 }
-module.exports = { isReady, recommend, chat, review, normalizeDraft }
+
+function normalizeOrganizedDraft(raw, summary = {}) {
+  const draft = normalizeDraft(raw, summary)
+  if (!draft) return null
+  const actions = draft.type === 'plan' && Array.isArray(raw.actions) ? raw.actions
+    .filter((item) => item && typeof item.name === 'string' && item.name.trim())
+    .slice(0, 3)
+    .map((item) => ({
+      name: item.name.trim().slice(0, 30),
+      domainId: draft.domainId,
+      minutes: Math.min(720, Math.max(1, Math.round(Number(item.minutes) || 30))),
+      preparation: String(item.preparation || '不需要额外准备').slice(0, 60),
+      energy: ['low', 'medium', 'high'],
+      environments: ['any'],
+      source: 'ai'
+    })) : []
+  return { ...draft, actions }
+}
+
+module.exports = { isReady, recommend, organizeThought, chat, review, normalizeDraft, normalizeOrganizedDraft }

@@ -19,8 +19,27 @@
     <text class="section-note">刚才去做的事 · 等你回来记录</text><view class="pending-name">{{pendingAction.actionName}}</view>
     <view class="button-row"><button class="primary-btn" bindtap="openPending">留个足迹</button><button class="secondary-btn" bindtap="dismissPending">结束，不记录</button></view>
   </view>
+  <view class="thought-section section">
+    <view class="section-head"><view><text class="section-title">写下你想做的事</text><text class="section-note">系统会帮你整理，不替你决定</text></view></view>
+    <view class="thought-card glass-card card-pad">
+      <textarea class="thought-input" auto-height maxlength="500" placeholder="今晚的一个念头，或以后想体验的生活…" placeholder-class="placeholder" value="{{thoughtInput}}" bindinput="onThoughtInput"></textarea>
+      <view class="thought-actions"><button class="primary-btn" loading="{{organizingThought}}" disabled="{{!thoughtInput || organizingThought}}" bindtap="organizeThought">{{organizingThought ? '正在整理…' : '帮我整理'}}</button><button class="secondary-btn" disabled="{{!thoughtInput || organizingThought}}" bindtap="keepThought">先记下来</button></view>
+    </view>
+    <view wx:if="{{thoughtDraft}}" class="thought-draft solid-card">
+      <view class="thought-draft-head"><text class="tag">{{thoughtDraft.type === 'plan' ? '计划草稿' : '行动草稿'}}</text><text class="thought-domain">{{thoughtDraft.domainName}}</text></view>
+      <view class="thought-draft-name">{{thoughtDraft.name}}</view>
+      <view wx:if="{{thoughtDraft.why}}" class="thought-draft-why">{{thoughtDraft.why}}</view>
+      <view wx:if="{{thoughtDraft.type === 'action'}}" class="thought-draft-meta">预计 {{thoughtDraft.minutes}} 分钟 · {{thoughtDraft.preparation}}</view>
+      <view wx:if="{{thoughtDraft.type === 'plan' && thoughtDraft.actions.length}}" class="thought-steps">
+        <view class="thought-steps-title">建议的第一步 · 点按可取消</view>
+        <view wx:for="{{thoughtDraft.actions}}" wx:key="draftKey" class="thought-step {{item.included ? '' : 'excluded'}}" data-index="{{index}}" bindtap="toggleThoughtAction"><view class="thought-step-check">{{item.included ? '✓' : ''}}</view><view><text>{{item.name}}</text><text>{{item.minutes}} 分钟</text></view></view>
+      </view>
+      <view class="thought-draft-actions"><button class="ghost-btn" bindtap="discardThoughtDraft">暂不保存</button><button class="secondary-btn" bindtap="editThoughtDraft">修改</button><button class="primary-btn" bindtap="saveThoughtDraft">确认保存</button></view>
+    </view>
+    <button wx:if="{{thoughtSavedTarget}}" class="secondary-btn thought-saved" bindtap="openThoughtSaved">{{thoughtSavedTarget.type === 'plan' ? '查看刚保存的计划' : '看看这个行动'}}</button>
+  </view>
   <view class="section">
-    <view class="section-head"><text class="section-title">现在的状态</text><text class="section-note">只选此刻，不替未来决定</text></view>
+    <view class="section-head"><text class="section-title">不知道做什么？</text><text class="section-note">看看此刻的选择</text></view>
     <view class="state-card glass-card card-pad">
       <view class="field-label first">有多少时间</view>
       <view class="chips"><view wx:for="{{timeOptions}}" wx:key="value" class="chip {{context.minutes === item.value || (item.value === -1 && customTime) ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectTime">{{item.value === -1 && customTime ? context.minutes + " 分钟" : item.label}}</view></view>

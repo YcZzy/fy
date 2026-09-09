@@ -1,6 +1,7 @@
 const repository = require('../../services/repository')
 const format = require('../../services/format')
 const themeService = require('../../services/theme')
+const domainCatalog = require('../../data/domains')
 
 Page({
   data: { action: null, session: null, elapsed: '00:00', finished: false, theme: 'now', plans: [], planIndex: 0 },
@@ -24,7 +25,7 @@ Page({
     const snapshot = (state.activeSession && state.activeSession.actionId === this.actionId && state.activeSession.actionSnapshot) || (state.pendingAction && state.pendingAction.actionId === this.actionId && state.pendingAction.actionSnapshot)
     const raw = snapshot || (entity ? { ...entity, ...(suggestion ? { reason: suggestion.reason, locationNote: suggestion.locationNote, planId: suggestion.planId } : {}) } : suggestion)
     if (!raw) { wx.showToast({ title: '行动不存在', icon: 'none' }); setTimeout(() => wx.navigateBack(), 500); return }
-    const domain = state.domains.find((item) => item.id === raw.domainId)
+    const domain = domainCatalog.findDomain(state.domains, raw.domainId)
     const sessionSnapshot = state.activeSession && state.activeSession.actionId === raw.id && state.activeSession.actionSnapshot
     const pendingSnapshot = state.pendingAction && state.pendingAction.actionId === raw.id && state.pendingAction.actionSnapshot
     const planId = (sessionSnapshot && sessionSnapshot.planId) || (pendingSnapshot && pendingSnapshot.planId) || (this.planSelected ? this.planId : raw.planId || '')

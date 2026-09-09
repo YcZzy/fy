@@ -1,4 +1,5 @@
 const { uid } = require('./format')
+const domainCatalog = require('../data/domains')
 
 const DOMAIN_GROUPS = {
   focus: ['learn', 'career', 'travel', 'connect', 'create'],
@@ -18,7 +19,7 @@ function contextKey(context) {
 }
 
 function withPresentation(action, state, reason) {
-  const domain = state.domains.find((item) => item.id === action.domainId)
+  const domain = domainCatalog.findDomain(state.domains, action.domainId)
   const plan = state.plans.find((item) => item.id === action.planId) || state.plans.find((item) => item.focused && !['ended', 'paused'].includes(item.status) && (item.actionIds || []).includes(action.id)) || state.plans.find((item) => (item.actionIds || []).includes(action.id))
   return {
     ...action,
@@ -121,7 +122,7 @@ function recommend(state, context, options = {}) {
 
 function normalizeAiRecommendations(rawItems, state, context) {
   if (!Array.isArray(rawItems)) return []
-  const domainIds = new Set(state.domains.filter((item) => !item.hidden).map((item) => item.id))
+  const domainIds = new Set(domainCatalog.allDomains(state.domains).map((item) => item.id))
   const intents = intentDomains(context.note); const used = new Set(); const names = new Set()
   return rawItems.filter((item) => item && typeof item.name === 'string' && item.name.trim().length >= 2).map((item) => {
     const name = item.name.trim().slice(0, 30)

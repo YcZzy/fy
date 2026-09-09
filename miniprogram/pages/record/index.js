@@ -3,6 +3,7 @@ const cloud = require('../../services/cloud')
 const format = require('../../services/format')
 const themeService = require('../../services/theme')
 const form = require('../../services/form')
+const domainCatalog = require('../../data/domains')
 const FEELINGS = [{ value: 'love', label: '很喜欢', symbol: '晴' }, { value: 'good', label: '还不错', symbol: '暖' }, { value: 'okay', label: '一般', symbol: '平' }, { value: 'poor', label: '不太喜欢', symbol: '淡' }]
 const DURATIONS = [{ label: '10 分钟', value: 10 }, { label: '半小时', value: 30 }, { label: '1 小时', value: 60 }, { label: '2 小时', value: 120 }, { label: '不记录', value: null }]
 const COMPLETIONS = [{ value: 'done', label: '做完了' }, { value: 'partial', label: '做了一部分' }, { value: 'not_started', label: '最后没做' }]
@@ -22,10 +23,10 @@ Page({
     if (!existing && ['timer', 'direct'].includes(this.mode) && !session) { wx.showToast({ title: '这件事已处理，请从足迹中查看', icon: 'none' }); wx.navigateBack(); return }
     if (this.mode === 'timer' && session && session.status === 'running') { repository.pauseSession(); state = repository.getState(); session = state.activeSession }
     this.sessionId = session ? session.id : ''
-    const domains = [{ id: '', name: '未分类' }, ...state.domains.filter((item) => !item.hidden)]
+    const domains = [{ id: '', name: '未分类' }, ...domainCatalog.allDomains(state.domains)]
     const raw = existing ? { id: existing.actionId, name: existing.actionName, domainId: existing.domainId, domainName: existing.domainName, planId: existing.planId || '', planName: existing.planName || '', minutes: existing.minutes } :
       (session && session.actionSnapshot) || state.actions.find((item) => item.id === options.actionId) || { id: '', name: '', domainId: '', minutes: null }
-    const domain = state.domains.find((item) => item.id === raw.domainId)
+    const domain = domainCatalog.findDomain(state.domains, raw.domainId)
     const planId = raw.planId || options.planId || ''
     const plan = state.plans.find((item) => item.id === planId)
     const action = { ...raw, domainName: raw.domainName || (domain && domain.name) || '生活', planId, planName: raw.planName || (plan && plan.name) || '' }

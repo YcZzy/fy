@@ -13,6 +13,11 @@
   </view>
   <view class="save-hint">{{dirty || isNew ? "内容尚未保存；开始、添加或编辑行动时会一并保存计划。" : "计划已保存"}}</view>
 
+  <view wx:if="{{isNew && draftActions.length}}" class="section">
+    <view class="section-head"><view><text class="section-title">建议的第一步</text><text class="section-note">点按可以取消，不必全部接受</text></view></view>
+    <view class="related-list solid-card"><view wx:for="{{draftActions}}" wx:key="draftKey" class="related-row selectable {{item.included ? 'linked' : ''}}" data-index="{{index}}" bindtap="toggleDraftAction"><view><text>{{item.name}}</text><text>{{item.minutes}} 分钟</text></view><text class="relation-state">{{item.included ? '会加入' : '不加入'}}</text></view></view>
+  </view>
+
   <view wx:if="{{!isNew}}" class="section">
     <view class="section-title">这段经历</view>
     <view class="plan-stats glass-card"><view><text>{{stats.count}}</text><text>次足迹</text></view><view class="stats-line"></view><view><text class="duration">{{stats.duration}}</text><text>累计时长</text></view></view>
